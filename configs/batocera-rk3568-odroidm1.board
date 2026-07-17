@@ -39,12 +39,16 @@ BR2_PACKAGE_HOST_DTC=y
 BR2_PACKAGE_BATOCERA_KODI21=y
 BR2_TARGET_ROOTFS_SQUASHFS4_ZSTD=y
 
-# GPU - Mali-G52 blob (hardkernel), not Panfrost (BSP kernel predates usable Panfrost CSF support)
+# GPU - Mali-G52 blob (hardkernel). The kernel also builds Panfrost as an
+# unused module (matches the real device: loaded, refcount 0) but we use
+# the proprietary blob, matching what's verified working on hardware.
 BR2_PACKAGE_MALI_G52_ODROIDM1=y
 
-# Enable Wayland & XWayland
+# Enable Wayland - XWayland left off: the Mali-G52 blob only provides
+# GLES/EGL (no desktop OpenGL), and XWayland pulls in several X11 games/
+# tools that hard-depend on libgl (etlegacy, sonic-mania, supermodel,
+# pcmanfm, ...), which fails buildroot's dependency-chain check outright.
 BR2_PACKAGE_BATOCERA_WAYLAND_LABWC=y
-BR2_PACKAGE_BATOCERA_XWAYLAND=y
 
 # Firmware
 BR2_PACKAGE_FIRMWARE_ARMBIAN=y
