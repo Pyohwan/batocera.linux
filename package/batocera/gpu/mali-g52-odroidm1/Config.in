@@ -7,6 +7,7 @@ config BR2_PACKAGE_MALI_G52_ODROIDM1
 	select BR2_PACKAGE_HAS_LIBGLES
 	select BR2_PACKAGE_HAS_LIBMALI
 	select BR2_PACKAGE_HAS_LIBGBM
+	select BR2_PACKAGE_MESA3D_HEADERS
 	help
 	  Install the binary user-space libraries for the ARM Mali-G52 GPU,
 	  matching the g13p0 in-kernel DDK used by the hardkernel BSP kernel

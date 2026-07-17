@@ -17,12 +17,15 @@ MALI_G52_ODROIDM1_LICENSE_FILES = usr/share/doc/libmali-bifrost-g52-g13p0-waylan
 
 MALI_G52_ODROIDM1_INSTALL_STAGING = YES
 MALI_G52_ODROIDM1_PROVIDES = libegl libgbm libgles libmali
-MALI_G52_ODROIDM1_DEPENDENCIES = libdrm wayland
+MALI_G52_ODROIDM1_DEPENDENCIES = libdrm wayland mesa3d-headers
 
-# The .deb ships libraries only, no KHR/EGL/GLES/GBM headers. Pull them from
-# the same libmali source tarball mali-g31-gbm already uses in this tree
-# (rockchip-linux/libmali, mirrored by batocera-linux) - just the headers,
-# not building the whole thing from source.
+# The .deb ships libraries only, no headers at all. The vendor libmali source
+# tarball (same one mali-g31-gbm uses) ships its own KHR/EGL/GLES/GLES2/CL
+# snapshot too, but it's dated 2022-03 (EGL_EGLEXT_VERSION 20190808) - wlroots
+# and other modern consumers reject it as "too old". Use mesa3d-headers
+# (current upstream Mesa release, selected below) for those instead, and only
+# pull GBM/GLES3/FBDEV from the vendor tarball - the bits mesa3d-headers
+# doesn't ship.
 MALI_G52_ODROIDM1_HEADERS_VERSION = ad4c28932c3d07c75fc41dd4a3333f9013a25e7f
 MALI_G52_ODROIDM1_EXTRA_DOWNLOADS = https://github.com/batocera-linux/rockchip-packages/releases/download/20220303/libmali-$(MALI_G52_ODROIDM1_HEADERS_VERSION).tar.gz
 
@@ -32,18 +35,14 @@ define MALI_G52_ODROIDM1_EXTRACT_CMDS
 	mkdir -p $(@D)/usr/include
 	$(TAR) xf $(MALI_G52_ODROIDM1_DL_DIR)/libmali-$(MALI_G52_ODROIDM1_HEADERS_VERSION).tar.gz \
 		--strip-components=2 -C $(@D)/usr/include \
-		libmali-$(MALI_G52_ODROIDM1_HEADERS_VERSION)/include
-	# matches upstream's own meson.build: KHR/mali_khrplatform.h installs as khrplatform.h
-	cp $(@D)/usr/include/KHR/mali_khrplatform.h $(@D)/usr/include/KHR/khrplatform.h
+		libmali-$(MALI_G52_ODROIDM1_HEADERS_VERSION)/include/GBM \
+		libmali-$(MALI_G52_ODROIDM1_HEADERS_VERSION)/include/GLES3 \
+		libmali-$(MALI_G52_ODROIDM1_HEADERS_VERSION)/include/FBDEV
 	# unlike EGL/GLES (meant to be #include <EGL/egl.h>), gbm.h is a top-level
 	# header upstream (mesa installs it directly to $prefix/include/gbm.h) -
 	# this vendor tarball nests it under GBM/ instead, which trips up cmake's
 	# FindGBM (looks for $(includedir)/gbm.h, not $(includedir)/GBM/gbm.h)
 	cp $(@D)/usr/include/GBM/gbm.h $(@D)/usr/include/gbm.h
-	# This target has no X11 (no XWayland), but eglplatform.h's generic
-	# "#elif defined(__unix__)" fallback assumes X11 unless steered to
-	# its earlier Wayland/GBM-safe branch via this define.
-	sed -i '1a #define MESA_EGL_NO_X11_HEADERS 1' $(@D)/usr/include/EGL/eglplatform.h
 	# On a real dpkg system these top-level sonames get created by
 	# update-alternatives at install time (nothing in this .deb's own
 	# postinst does it - it only ships a reboot notice). Since we're
@@ -69,6 +68,13 @@ define MALI_G52_ODROIDM1_INSTALL_STAGING_CMDS
 	mkdir -p $(STAGING_DIR)/usr/lib/pkgconfig
 	cp -R $(@D)/usr/include/* $(STAGING_DIR)/usr/include/
 	cp -R $(@D)/usr/lib/aarch64-linux-gnu/* $(STAGING_DIR)/usr/lib/
+	# This target has no X11 (no XWayland), but eglplatform.h's generic
+	# "#elif defined(__unix__)" fallback assumes X11 unless steered to
+	# its earlier Wayland/GBM-safe branch via this define. mesa3d-headers
+	# (our EGL header source, see DEPENDENCIES) ships the same upstream
+	# eglplatform.h logic, so patch its staged copy the same way.
+	grep -q MESA_EGL_NO_X11_HEADERS $(STAGING_DIR)/usr/include/EGL/eglplatform.h || \
+		sed -i '1a #define MESA_EGL_NO_X11_HEADERS 1' $(STAGING_DIR)/usr/include/EGL/eglplatform.h
 	$(INSTALL) -D -m 0644 $(MALI_G52_ODROIDM1_PKGDIR)/egl.pc \
 		$(STAGING_DIR)/usr/lib/pkgconfig/egl.pc
 	$(INSTALL) -D -m 0644 $(MALI_G52_ODROIDM1_PKGDIR)/glesv2.pc \
