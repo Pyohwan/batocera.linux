@@ -64,6 +64,12 @@ define MALI_G52_ODROIDM1_INSTALL_STAGING_CMDS
 	mkdir -p $(STAGING_DIR)/usr/lib/pkgconfig
 	cp -R $(@D)/usr/include/* $(STAGING_DIR)/usr/include/
 	cp -R $(@D)/usr/lib/aarch64-linux-gnu/* $(STAGING_DIR)/usr/lib/
+	$(INSTALL) -D -m 0644 $(MALI_G52_ODROIDM1_PKGDIR)/egl.pc \
+		$(STAGING_DIR)/usr/lib/pkgconfig/egl.pc
+	$(INSTALL) -D -m 0644 $(MALI_G52_ODROIDM1_PKGDIR)/glesv2.pc \
+		$(STAGING_DIR)/usr/lib/pkgconfig/glesv2.pc
+	$(INSTALL) -D -m 0644 $(MALI_G52_ODROIDM1_PKGDIR)/gbm.pc \
+		$(STAGING_DIR)/usr/lib/pkgconfig/gbm.pc
 endef
 
 define MALI_G52_ODROIDM1_INSTALL_TARGET_CMDS

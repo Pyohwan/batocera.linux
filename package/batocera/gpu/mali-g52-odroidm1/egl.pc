@@ -1,0 +1,11 @@
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: egl
+Description: Mali G52 (odroid-m1) implementation of EGL
+Version: 1.5
+Requires:
+Libs: -L${libdir} -lEGL
+Cflags: -I${includedir} -DEGL_NO_X11 -DMESA_EGL_NO_X11_HEADERS
