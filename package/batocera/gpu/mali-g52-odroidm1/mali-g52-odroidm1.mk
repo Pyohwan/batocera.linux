@@ -19,13 +19,25 @@ MALI_G52_ODROIDM1_INSTALL_STAGING = YES
 MALI_G52_ODROIDM1_PROVIDES = libegl libgbm libgles libmali
 MALI_G52_ODROIDM1_DEPENDENCIES = libdrm wayland
 
+# The .deb ships libraries only, no KHR/EGL/GLES/GBM headers. Pull them from
+# the same libmali source tarball mali-g31-gbm already uses in this tree
+# (rockchip-linux/libmali, mirrored by batocera-linux) - just the headers,
+# not building the whole thing from source.
+MALI_G52_ODROIDM1_HEADERS_VERSION = ad4c28932c3d07c75fc41dd4a3333f9013a25e7f
+MALI_G52_ODROIDM1_EXTRA_DOWNLOADS = https://github.com/batocera-linux/rockchip-packages/releases/download/20220303/libmali-$(MALI_G52_ODROIDM1_HEADERS_VERSION).tar.gz
+
 define MALI_G52_ODROIDM1_EXTRACT_CMDS
 	$(AR) --output=$(@D) -x $(MALI_G52_ODROIDM1_DL_DIR)/$(MALI_G52_ODROIDM1_SOURCE)
 	$(TAR) xf $(@D)/data.tar.gz -C $(@D)
+	mkdir -p $(@D)/usr/include
+	$(TAR) xf $(MALI_G52_ODROIDM1_DL_DIR)/libmali-$(MALI_G52_ODROIDM1_HEADERS_VERSION).tar.gz \
+		--strip-components=2 -C $(@D)/usr/include \
+		libmali-$(MALI_G52_ODROIDM1_HEADERS_VERSION)/include
 endef
 
 define MALI_G52_ODROIDM1_INSTALL_STAGING_CMDS
 	mkdir -p $(STAGING_DIR)/usr/lib/pkgconfig
+	cp -R $(@D)/usr/include/* $(STAGING_DIR)/usr/include/
 	cp -R $(@D)/usr/lib/aarch64-linux-gnu/* $(STAGING_DIR)/usr/lib/
 endef
 
