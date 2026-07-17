@@ -44,11 +44,19 @@ define MALI_G52_ODROIDM1_EXTRACT_CMDS
 	# postinst does it - it only ships a reboot notice). Since we're
 	# not running dpkg, recreate them ourselves so find_library() and
 	# normal linking can find EGL/GLESv1/GLESv2/gbm/wayland-egl at the
-	# standard path instead of only inside mali/.
-	for lib in EGL GLESv1_CM GLESv2 MaliOpenCL gbm wayland-egl; do \
-		target=$$(readlink $(@D)/usr/lib/aarch64-linux-gnu/mali/lib$${lib}.so); \
-		ln -sf mali/$${target} $(@D)/usr/lib/aarch64-linux-gnu/$${target}; \
-		ln -sf $${target} $(@D)/usr/lib/aarch64-linux-gnu/lib$${lib}.so; \
+	# standard path.
+	#
+	# Point them at libmali.so.1.9.0 itself, not mali/libEGL.so.1 etc:
+	# those per-API files under mali/ are near-empty shims (checked
+	# with nm -D: 4 boilerplate symbols, no eglGetProcAddress or
+	# anything else) meant to be fixed up at runtime by libmali-hook /
+	# mali-priority.sh: not something a static link at build time can
+	# rely on. libmali.so.1.9.0 exports every symbol directly (EGL,
+	# GLESv1/2, GBM, wayland-egl - confirmed each with nm -D).
+	for lib in EGL:1 GLESv1_CM:1 GLESv2:2 MaliOpenCL:1 gbm:1 wayland-egl:1; do \
+		name=$${lib%%:*}; ver=$${lib##*:}; \
+		ln -sf libmali.so.1.9.0 $(@D)/usr/lib/aarch64-linux-gnu/lib$${name}.so.$${ver}; \
+		ln -sf lib$${name}.so.$${ver} $(@D)/usr/lib/aarch64-linux-gnu/lib$${name}.so; \
 	done
 endef
 
