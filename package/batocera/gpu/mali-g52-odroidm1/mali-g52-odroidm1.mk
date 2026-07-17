@@ -43,6 +43,11 @@ define MALI_G52_ODROIDM1_EXTRACT_CMDS
 	# this vendor tarball nests it under GBM/ instead, which trips up cmake's
 	# FindGBM (looks for $(includedir)/gbm.h, not $(includedir)/GBM/gbm.h)
 	cp $(@D)/usr/include/GBM/gbm.h $(@D)/usr/include/gbm.h
+	# The vendor tarball's GLES3 dir is missing gl3ext.h entirely (has
+	# gl3.h/gl31.h/gl32.h/gl3platform.h only). Per upstream Khronos
+	# convention this file is essentially a placeholder (GLES3 extensions
+	# are declared in GLES2/gl2ext.h instead) - ship that standard content.
+	cp $(MALI_G52_ODROIDM1_PKGDIR)/gl3ext.h $(@D)/usr/include/GLES3/gl3ext.h
 	# On a real dpkg system these top-level sonames get created by
 	# update-alternatives at install time (nothing in this .deb's own
 	# postinst does it - it only ships a reboot notice). Since we're
