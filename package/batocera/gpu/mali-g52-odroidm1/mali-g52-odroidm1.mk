@@ -35,6 +35,11 @@ define MALI_G52_ODROIDM1_EXTRACT_CMDS
 		libmali-$(MALI_G52_ODROIDM1_HEADERS_VERSION)/include
 	# matches upstream's own meson.build: KHR/mali_khrplatform.h installs as khrplatform.h
 	cp $(@D)/usr/include/KHR/mali_khrplatform.h $(@D)/usr/include/KHR/khrplatform.h
+	# unlike EGL/GLES (meant to be #include <EGL/egl.h>), gbm.h is a top-level
+	# header upstream (mesa installs it directly to $prefix/include/gbm.h) -
+	# this vendor tarball nests it under GBM/ instead, which trips up cmake's
+	# FindGBM (looks for $(includedir)/gbm.h, not $(includedir)/GBM/gbm.h)
+	cp $(@D)/usr/include/GBM/gbm.h $(@D)/usr/include/gbm.h
 	# This target has no X11 (no XWayland), but eglplatform.h's generic
 	# "#elif defined(__unix__)" fallback assumes X11 unless steered to
 	# its earlier Wayland/GBM-safe branch via this define.
