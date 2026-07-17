@@ -33,6 +33,12 @@ define MALI_G52_ODROIDM1_EXTRACT_CMDS
 	$(TAR) xf $(MALI_G52_ODROIDM1_DL_DIR)/libmali-$(MALI_G52_ODROIDM1_HEADERS_VERSION).tar.gz \
 		--strip-components=2 -C $(@D)/usr/include \
 		libmali-$(MALI_G52_ODROIDM1_HEADERS_VERSION)/include
+	# matches upstream's own meson.build: KHR/mali_khrplatform.h installs as khrplatform.h
+	cp $(@D)/usr/include/KHR/mali_khrplatform.h $(@D)/usr/include/KHR/khrplatform.h
+	# This target has no X11 (no XWayland), but eglplatform.h's generic
+	# "#elif defined(__unix__)" fallback assumes X11 unless steered to
+	# its earlier Wayland/GBM-safe branch via this define.
+	sed -i '1a #define MESA_EGL_NO_X11_HEADERS 1' $(@D)/usr/include/EGL/eglplatform.h
 endef
 
 define MALI_G52_ODROIDM1_INSTALL_STAGING_CMDS
