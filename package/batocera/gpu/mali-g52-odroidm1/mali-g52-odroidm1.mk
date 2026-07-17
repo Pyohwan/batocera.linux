@@ -39,6 +39,17 @@ define MALI_G52_ODROIDM1_EXTRACT_CMDS
 	# "#elif defined(__unix__)" fallback assumes X11 unless steered to
 	# its earlier Wayland/GBM-safe branch via this define.
 	sed -i '1a #define MESA_EGL_NO_X11_HEADERS 1' $(@D)/usr/include/EGL/eglplatform.h
+	# On a real dpkg system these top-level sonames get created by
+	# update-alternatives at install time (nothing in this .deb's own
+	# postinst does it - it only ships a reboot notice). Since we're
+	# not running dpkg, recreate them ourselves so find_library() and
+	# normal linking can find EGL/GLESv1/GLESv2/gbm/wayland-egl at the
+	# standard path instead of only inside mali/.
+	for lib in EGL GLESv1_CM GLESv2 MaliOpenCL gbm wayland-egl; do \
+		target=$$(readlink $(@D)/usr/lib/aarch64-linux-gnu/mali/lib$${lib}.so); \
+		ln -sf mali/$${target} $(@D)/usr/lib/aarch64-linux-gnu/$${target}; \
+		ln -sf $${target} $(@D)/usr/lib/aarch64-linux-gnu/lib$${lib}.so; \
+	done
 endef
 
 define MALI_G52_ODROIDM1_INSTALL_STAGING_CMDS
