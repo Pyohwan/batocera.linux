@@ -4,6 +4,6 @@ includedir=${prefix}/include
 
 Name: gbm
 Description: Mali G52 (odroid-m1) Generic Buffer Manager
-Version: 1.0.0
+Version: 26.1.4
 Libs: -L${libdir} -lgbm
 Cflags: -I${includedir}
