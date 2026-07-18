@@ -87,6 +87,22 @@ define MALI_G52_ODROIDM1_INSTALL_STAGING_CMDS
 	# eglplatform.h logic, so patch its staged copy the same way.
 	grep -q MESA_EGL_NO_X11_HEADERS $(STAGING_DIR)/usr/include/EGL/eglplatform.h || \
 		sed -i '1a #define MESA_EGL_NO_X11_HEADERS 1' $(STAGING_DIR)/usr/include/EGL/eglplatform.h
+	# This vendor gbm.h (2022-03 snapshot) predates upstream Mesa's standard
+	# name for per-plane DMA-BUF export: it only declares the fd itself as
+	# gbm_bo_get_fd_per_plane (confirmed still exported under that name by
+	# nm -D on libmali.so.1.9.0), not the gbm_bo_get_fd_for_plane name
+	# wlroots >= 0.18 actually calls. Same function/signature, alias it.
+	# Insert right before the closing "#ifdef __cplusplus / }" block (the
+	# second occurrence) so it stays inside both extern "C" and the
+	# include guard, instead of a blind end-of-file append.
+	if ! grep -q gbm_bo_get_fd_for_plane $(STAGING_DIR)/usr/include/gbm.h; then \
+		LINE=$$(grep -n '^#ifdef __cplusplus' $(STAGING_DIR)/usr/include/gbm.h | tail -1 | cut -d: -f1); \
+		head -n $$((LINE-1)) $(STAGING_DIR)/usr/include/gbm.h > $(STAGING_DIR)/usr/include/gbm.h.new; \
+		printf 'int\ngbm_bo_get_fd_per_plane(struct gbm_bo *bo, int plane);\n#define gbm_bo_get_fd_for_plane gbm_bo_get_fd_per_plane\n\n' \
+			>> $(STAGING_DIR)/usr/include/gbm.h.new; \
+		tail -n +$$LINE $(STAGING_DIR)/usr/include/gbm.h >> $(STAGING_DIR)/usr/include/gbm.h.new; \
+		mv $(STAGING_DIR)/usr/include/gbm.h.new $(STAGING_DIR)/usr/include/gbm.h; \
+	fi
 	$(INSTALL) -D -m 0644 $(MALI_G52_ODROIDM1_PKGDIR)/egl.pc \
 		$(STAGING_DIR)/usr/lib/pkgconfig/egl.pc
 	$(INSTALL) -D -m 0644 $(MALI_G52_ODROIDM1_PKGDIR)/glesv2.pc \
