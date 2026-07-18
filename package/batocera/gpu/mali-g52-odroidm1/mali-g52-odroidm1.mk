@@ -89,8 +89,14 @@ define MALI_G52_ODROIDM1_INSTALL_STAGING_CMDS
 endef
 
 define MALI_G52_ODROIDM1_INSTALL_TARGET_CMDS
-	mkdir -p $(TARGET_DIR)/etc/ld.so.conf.d $(TARGET_DIR)/etc/OpenCL/vendors
-	cp -R $(@D)/etc/* $(TARGET_DIR)/etc/
+	# not etc/ld.so.conf.d/00-aarch64-mali.conf: buildroot's target-finalize
+	# forbids that directory entirely (it bakes lib search paths into the
+	# toolchain instead of relying on runtime ldconfig), and we don't need
+	# it anyway - it only registers usr/lib/aarch64-linux-gnu/mali, the
+	# near-empty shim directory we never link against (see EXTRACT_CMDS).
+	mkdir -p $(TARGET_DIR)/etc/OpenCL/vendors $(TARGET_DIR)/etc/profile.d
+	cp -R $(@D)/etc/OpenCL/vendors/* $(TARGET_DIR)/etc/OpenCL/vendors/
+	cp -R $(@D)/etc/profile.d/* $(TARGET_DIR)/etc/profile.d/
 	cp -R $(@D)/usr/lib/aarch64-linux-gnu/* $(TARGET_DIR)/usr/lib/
 endef
 
