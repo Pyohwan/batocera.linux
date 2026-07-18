@@ -37,7 +37,14 @@ define MALI_G52_ODROIDM1_EXTRACT_CMDS
 		--strip-components=2 -C $(@D)/usr/include \
 		libmali-$(MALI_G52_ODROIDM1_HEADERS_VERSION)/include/GBM \
 		libmali-$(MALI_G52_ODROIDM1_HEADERS_VERSION)/include/GLES3 \
-		libmali-$(MALI_G52_ODROIDM1_HEADERS_VERSION)/include/FBDEV
+		libmali-$(MALI_G52_ODROIDM1_HEADERS_VERSION)/include/FBDEV \
+		libmali-$(MALI_G52_ODROIDM1_HEADERS_VERSION)/include/KHR/mali_khrplatform.h
+	# The vendor GLES3/gl3platform.h does "#include <KHR/mali_khrplatform.h>"
+	# instead of the standard "<KHR/khrplatform.h>" - it's the same Khronos
+	# platform-typedefs content (same header guard, __khrplatform_h_), just
+	# shipped under ARM's own filename. mesa3d-headers only installs the
+	# standard-named khrplatform.h, so this vendor-named copy has to come
+	# from here too, alongside it (no filename collision, both can coexist).
 	# unlike EGL/GLES (meant to be #include <EGL/egl.h>), gbm.h is a top-level
 	# header upstream (mesa installs it directly to $prefix/include/gbm.h) -
 	# this vendor tarball nests it under GBM/ instead, which trips up cmake's
