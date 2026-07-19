@@ -1,0 +1,19 @@
+# --- Hardkernel ODROID-M1 default values ---
+# Matched at runtime via /sys/firmware/devicetree/base/model
+# ("Hardkernel ODROID-M1" -> sanitized to "Hardkernel_ODROID_M1" by
+# batocera-settings-get-master, see package/batocera/core/batocera-settings/
+# batocera-settings-get-master).
+
+# Preferred output: HDMI is the primary use case, VU8M (DSI) is a small
+# secondary panel. Without this, first boot falls back to whichever output
+# batocera-resolution enumerates first, which is not guaranteed to be HDMI.
+global.videooutput=HDMI-A-1
+
+# VU8M is a portrait-mounted panel; rotate for landscape UI when it's used
+# as an output. Enumerates as DSI-1 under labwc (confirmed live on device).
+# NOTE: rotation direction (1=90 vs 3=270) not yet verified live with this
+# patch - candidate value, adjust with `batocera-settings-set
+# display.rotate.DSI-1 <0-3>` on device if it comes up mirrored/upside down.
+display.rotate.DSI-1=1
+# DRM rotation, for the splash screen (early boot, before labwc starts)
+display.rotate.DSI=1
