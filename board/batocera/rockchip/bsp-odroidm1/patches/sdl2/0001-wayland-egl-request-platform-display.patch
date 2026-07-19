@@ -30,7 +30,7 @@ the platform constant here is the only missing piece.
 
 --- a/src/video/wayland/SDL_waylandopengles.c
 +++ b/src/video/wayland/SDL_waylandopengles.c
-@@ -37,7 +37,10 @@ int Wayland_GLES_LoadLibrary(_THIS, const char *path)
+@@ -37,7 +37,11 @@ int Wayland_GLES_LoadLibrary(_THIS, const char *path)
      int ret;
      SDL_VideoData *data = (SDL_VideoData *)_this->driverdata;
  
