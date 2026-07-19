@@ -11,7 +11,7 @@ BR2_TARGET_GENERIC_GETTY_BAUDRATE_115200=y
 # that needs newer V4L2 UAPI structs only present in the shared target's
 # mainline 7.0.11 kernel headers, not our BSP fork. Only the uboot patches
 # from there are relevant to us, copied into our own patches dir instead.
-BR2_GLOBAL_PATCH_DIR="$(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/patches $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/patches $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/rk3568-odroidm1/patches"
+BR2_GLOBAL_PATCH_DIR="$(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/patches $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/patches $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/bsp-odroidm1/patches"
 BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/fsoverlay $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/fsoverlay $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/rk3568/fsoverlay"
 
 # Kernel - our hardkernel BSP fork (HDMI+DSI dual livelock fix), not mainline
@@ -21,7 +21,7 @@ BR2_LINUX_KERNEL_CUSTOM_REPO_URL="https://github.com/Pyohwan/linux.git"
 BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION="fix-hdmi-dsi-dual-livelock"
 BR2_KERNEL_HEADERS_6_1=y
 BR2_LINUX_KERNEL_USE_CUSTOM_CONFIG=y
-BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="$(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/rk3568-odroidm1/linux-defconfig.config"
+BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="$(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/bsp-odroidm1/linux-defconfig.config"
 BR2_LINUX_KERNEL_NEEDS_HOST_OPENSSL=y
 
 # Build the DTB from the kernel sources - in-tree DTS, odroid-m1 only
@@ -30,7 +30,7 @@ BR2_LINUX_KERNEL_INTREE_DTS_NAME="rockchip/rk3568-odroid-m1"
 
 # Override the RK3568-family default board list (11 boards) - we only build odroid-m1
 BR2_TARGET_BATOCERA_IMAGES_DEFINITIONS=y
-BR2_TARGET_BATOCERA_IMAGES="rockchip/rk3568-odroidm1"
+BR2_TARGET_BATOCERA_IMAGES="rockchip/bsp-odroidm1"
 
 # Bootloader
 BR2_PACKAGE_HOST_DOSFSTOOLS=y
