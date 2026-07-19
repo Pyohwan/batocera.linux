@@ -14,6 +14,15 @@ MERGERFS_OPTS="-o cache.files=partial,dropcacheonclose=true,category.create=eplf
 # --- HELPERS ---
 log_msg() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"; }
 
+# mergerfs is FUSE-based and needs /dev/fuse, but nothing before this script
+# in the boot sequence guarantees the fuse module is loaded (unlike
+# batocera-mount, which does this same modprobe before its own FUSE mounts).
+# Without it, every mergerfs call below fails silently with "Live mount
+# failed" and the ROM pool never gets populated - confirmed live on hardware.
+ensure_fuse_loaded() {
+    [ -e /dev/fuse ] || modprobe fuse 2>>"$LOG_FILE"
+}
+
 log_initial_info() {
     local INIT_LOCK_DIR="/tmp/batocera-storage.init.lock"
 
@@ -549,9 +558,17 @@ case "$COMMAND" in
     fi
 
     # Check Pending Flag
-    PENDING_FLAG="/tmp/storage.pending.$PARENT_DISK"
+    # Scoped per-partition (not per-disk): a disk with several partitions
+    # (e.g. leftover installs from a previous OS alongside a real ROMs
+    # partition) must let each partition get its own merge/format prompt
+    # independently. A disk-wide flag here means whichever partition udev
+    # happens to enumerate first claims it and every other partition on
+    # that disk is silently skipped ("Pending flag exists") for the rest
+    # of the boot - confirmed live on hardware with a 4-partition NVMe
+    # drive, where the real ROMs partition kept losing this race.
+    PENDING_FLAG="/tmp/storage.pending.$DEVNAME"
     if [ -f "$PENDING_FLAG" ]; then
-        log_msg "SKIP: [$DEVNAME] Pending flag exists for '$PARENT_DISK'."
+        log_msg "SKIP: [$DEVNAME] Pending flag exists."
         exit 0
     fi
 
@@ -653,7 +670,8 @@ case "$COMMAND" in
     FINAL_OPTS="${MERGERFS_OPTS},nonempty"
 
     log_msg "REFRESH: Executing mergerfs with: $VALID_BRANCHES"
-    
+
+    ensure_fuse_loaded
     /usr/bin/mergerfs $FINAL_OPTS "$VALID_BRANCHES" "$POOL_PATH" 2>> "$LOG_FILE"
     
     if [ $? -eq 0 ]; then
@@ -675,8 +693,8 @@ case "$COMMAND" in
     DEVICE="/dev/$DEVNAME"
     
     if [[ "$DEVNAME" =~ ^sd[a-z][0-9]*$ ]]; then PARENT_DISK="${DEVNAME%%[0-9]*}"; else PARENT_DISK=$(lsblk -no pkname "$DEVICE" 2>/dev/null); [ -z "$PARENT_DISK" ] && PARENT_DISK="$DEVNAME"; fi
-    
-    rm -f "/tmp/storage.pending.$PARENT_DISK"
+
+    rm -f "/tmp/storage.pending.$DEVNAME"
     PARENT_LOCK="/tmp/storage.runtime.disk.$PARENT_DISK"
     mkdir "$PARENT_LOCK" 2>/dev/null || true
     trap "rmdir '$PARENT_LOCK' 2>/dev/null" EXIT
@@ -727,7 +745,7 @@ case "$COMMAND" in
     sleep 2
 
     # Manually Mount
-    mount_partition "$NEW_PART" "false" "/tmp/storage.pending.$PARENT_DISK"
+    mount_partition "$NEW_PART" "false" "/tmp/storage.pending.$(basename "$NEW_PART")"
     RET=$?
 
     if [ $RET -ne 0 ] && [ $RET -ne 2 ]; then
@@ -769,8 +787,8 @@ case "$COMMAND" in
         PARENT_DISK=$(lsblk -no pkname "$DEV_SOURCE" 2>/dev/null)
         [ -z "$PARENT_DISK" ] && PARENT_DISK="$DEV_NAME"
     fi
-    
-    rm -f "/tmp/storage.pending.$PARENT_DISK"
+
+    rm -f "/tmp/storage.pending.$DEV_NAME"
 
     if ! is_mounted "$MOUNT_POINT"; then
         REAL_PATH=$(readlink -f "$MOUNT_POINT")
@@ -825,6 +843,7 @@ case "$COMMAND" in
     BRANCHES_CMD="$BASE_DIR:$FULL_BRANCHES"
     
     log_msg "MERGE: Executing mergerfs..."
+    ensure_fuse_loaded
     /usr/bin/mergerfs $MERGERFS_OPTS "$BRANCHES_CMD" "$POOL_PATH"
     
     if [ $? -eq 0 ]; then
@@ -848,8 +867,8 @@ case "$COMMAND" in
     MOUNT_POINT=$(grep "^/dev/$DEVNAME " /proc/mounts | awk '{print $2}')
     
     if [ -z "$MOUNT_POINT" ]; then
-        # If not mounted, just clear the pending flag for the parent and exit
-        rm -f "/tmp/storage.pending.$PARENT_DISK"
+        # If not mounted, just clear this partition's pending flag and exit
+        rm -f "/tmp/storage.pending.$DEVNAME"
         exit 0
     fi
 
@@ -913,7 +932,8 @@ case "$COMMAND" in
         send_notification "NOTIFY:Rebuilding Pool..."
 
         mkdir -p "$BASE_DIR"
-        BRANCHES_CMD="$BASE_DIR:$CLEAN_CONFIG"       
+        BRANCHES_CMD="$BASE_DIR:$CLEAN_CONFIG"
+        ensure_fuse_loaded
         /usr/bin/mergerfs $MERGERFS_OPTS "$BRANCHES_CMD" "$POOL_PATH"
         
         if [ $? -eq 0 ]; then
@@ -987,13 +1007,14 @@ case "$COMMAND" in
         ID=$(get_unique_id "$D")
         if [[ "$ID" == "$UNIQUE_ID" ]] || [[ "${ID%:*}" == "$UNIQUE_ID" ]]; then
              rm -f "/tmp/storage.pending.$D"
-             $0 detect "$D" &            
+             $0 detect "$D" &
              # Trigger detection for every partition on this disk
              # This ensures handle_partition_event runs and mounts the volumes
              for part in /sys/class/block/$D/$D*; do
                  [ -e "$part" ] || continue
                  P=$(basename "$part")
                  [ "$P" == "$D" ] && continue
+                 rm -f "/tmp/storage.pending.$P"
                  log_msg "IGNORE: Re-triggering partition detection for $P"
                  $0 detect "$P" &
              done
