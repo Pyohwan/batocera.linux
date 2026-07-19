@@ -43,7 +43,7 @@ def connect_device(path, address, properties, forceConnect, filter):
   connected = False
 
   #
-  if filter is None:
+  if filter is None and not forceConnect:
     logging.info("skipping {}. No filter.".format(address))
     return
 
@@ -68,7 +68,7 @@ def connect_device(path, address, properties, forceConnect, filter):
 
   logging.info("filter={}, Icon={}, Address={}".format(filter, prop2str(properties["Icon"]), prop2str(properties["Address"])))
 
-  if not (filter is not None and (filter == prop2str(properties["Address"]) or (filter == "input" and prop2str(properties["Icon"]).startswith("input")) )):
+  if not forceConnect and not (filter is not None and (filter == prop2str(properties["Address"]) or (filter == "input" and prop2str(properties["Icon"]).startswith("input")) )):
     logging.info("Skipping device {} (not {})".format(getDevName(properties), filter));
     return
 
@@ -80,16 +80,36 @@ def connect_device(path, address, properties, forceConnect, filter):
     return
   
   if not paired:
-    if connected == False and gdiscovering:
+    # Discovery may have already stopped by the time this event is handled
+    # (e.g. the caller just picked this exact device from a list and
+    # discovery was stopped as part of that action) - don't let that gate
+    # out pairing for a specifically-targeted device, only for the broad
+    # "input" auto-pair scan. Without this, pairing was silently skipped
+    # and the code fell straight through to attempting Connect() on an
+    # unpaired device, which BlueZ rejects - confirmed live
+    # (br-connection-unknown, retried 5x, then gave up).
+    if connected == False and (gdiscovering or filter == prop2str(properties["Address"])):
       doPairing(address, devName, shortDevName)
-    #return
+    # device.Pair() is a blocking D-Bus call - by the time it returns here,
+    # `paired`/`trusted` above are stale (fetched before pairing started).
+    # Don't act on them: BlueZ fires its own PropertiesChanged(Paired=True)
+    # once pairing actually completes, which re-enters this function via
+    # properties_changed() with forceConnect=True and fresh properties.
+    return
 
   # now it is paired
   if not trusted and (gdiscovering or forceConnect):
     logging.info("Trusting (" + devName + ")")
     logging_status("Trusting " + shortDevName + "...")
-    bluezProps = dbus.Interface(bus.get_object("org.bluez", path), "org.freedesktop.DBus.Properties")
-    bluezProps.Set("org.bluez.Device1", "Trusted", True)
+    try:
+      bluezProps = dbus.Interface(bus.get_object("org.bluez", path), "org.freedesktop.DBus.Properties")
+      bluezProps.Set("org.bluez.Device1", "Trusted", True)
+    except dbus.exceptions.DBusException as e:
+      # Seen live: UnknownObject if the device's D-Bus object went away
+      # between the event firing and this call. Don't let it abort the
+      # whole event - still worth trying Connect() below (the device may
+      # already be trusted from an earlier session).
+      logging.info("Failed to set Trusted for {}: {}".format(devName, e))
 
   # now it is paired and trusted
   # Connect if Trusted and paired
