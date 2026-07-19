@@ -121,6 +121,16 @@ define MALI_G52_ODROIDM1_INSTALL_TARGET_CMDS
 	cp -R $(@D)/etc/OpenCL/vendors/* $(TARGET_DIR)/etc/OpenCL/vendors/
 	cp -R $(@D)/etc/profile.d/* $(TARGET_DIR)/etc/profile.d/
 	cp -R $(@D)/usr/lib/aarch64-linux-gnu/* $(TARGET_DIR)/usr/lib/
+	# Without this, any normally-linked consumer (confirmed with wlroots/
+	# labwc) intermittently fails at its first EGL call with "symbol
+	# lookup error: undefined symbol: eglQueryString" even though the
+	# symbol is genuinely exported (checked with nm -D/objdump -T,
+	# correctly-versioned, no duplicate libmali.so.1 elsewhere) - a lazy
+	# PLT-binding/symbol-visibility quirk specific to this vendor blob's
+	# huge, non-standard-toolchain-built export table. Forcing it into
+	# every process's global scope via ld.so.preload (confirmed fix,
+	# tested live via LD_PRELOAD) sidesteps whatever the exact defect is.
+	echo "/usr/lib/libmali.so.1.9.0" >> $(TARGET_DIR)/etc/ld.so.preload
 endef
 
 $(eval $(generic-package))
