@@ -34,6 +34,9 @@ start_pipewire() {
         sleep 0.1
         N=$((N+1))
     done
+    if [ ! -S "/run/dbus/system_bus_socket" ]; then
+        log "err" "D-Bus system socket still missing after 5s wait - WirePlumber's D-Bus module will likely fail to start"
+    fi
 
     # Cleanup stale locks
     rm -f /var/run/pipewire-0 /var/run/pipewire-0.lock
