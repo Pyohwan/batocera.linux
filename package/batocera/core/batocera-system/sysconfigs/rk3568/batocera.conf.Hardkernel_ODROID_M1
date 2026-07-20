@@ -20,12 +20,14 @@ global.videooutput2=none
 # S18governor defaults to "schedutil" when this is unset (see
 # board/batocera/fsoverlay/etc/init.d/S18governor) - schedutil's reactive
 # ramp-up lags noticeably behind bursty UI load like ES menu scrolling,
-# confirmed live: FPS fluctuated 40-50 on schedutil vs. a clean, steady
-# ~55-60 after forcing "performance" (all 4 cores at max 1.99GHz) as a
-# live A/B test. This is a mains-powered console with no battery to
-# manage and plenty of thermal headroom (~43C under load) - no real
-# downside to always running at max frequency here.
-system.cpu.governor=performance
+# confirmed live: FPS fluctuated 40-50 on schedutil. "performance" (all 4
+# cores pinned at max 1.99GHz) fixed it (~55-60fps), but "interactive"
+# (Android-derived, tuned specifically for bursty touch/UI-style load -
+# idles low, ramps fast on demand) matched it just as well in a live A/B
+# (mid-to-high 50s) while not sitting at max clock/power/heat during idle
+# menu time. Picked interactive over performance for that idle-efficiency
+# edge, same measured responsiveness.
+system.cpu.governor=interactive
 
 # VU8M is a portrait-mounted panel; rotate for landscape UI when it's used
 # as an output. Enumerates as DSI-1 under labwc (confirmed live on device).
