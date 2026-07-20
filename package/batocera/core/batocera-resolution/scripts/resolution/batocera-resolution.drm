@@ -188,6 +188,10 @@ case "${ACTION}" in
 		   # whatever connector happens to be index 0 silently fell
 		   # back to connector 0 via f_checkVals below - the output
 		   # selection appeared to do nothing.
+		   # Caveat: prefix match can mismatch on boards with a
+		   # connector name that's a strict prefix of another (e.g.
+		   # "DP" vs "DPI" - "dpi1" could match "dp"* first depending
+		   # on listing order). Not an issue on this board.
 		   NORM_MODE=$(echo "${MODE}" | tr -cd '[:alnum:]' | tr '[:upper:]' '[:lower:]')
 		   CONNECTORS=$(for GPU in /dev/dri/card*; do batocera-drminfo "${GPU}" 2>/dev/null; done | sed -e s+"^\([0-9]*\)\.[0-9]*:\([^ ]*\) .*$"+"\1 \2"+ | sort -u)
 		   MATCHED_CONN=$(echo "${CONNECTORS}" | while read -r CONN NAME; do

@@ -44,6 +44,10 @@ _wait_for_compositor() {
 # and selectable). Canonicalizing once up front means every subsequent
 # exact-string comparison in this script (which already assumes
 # listOutputs' own format) just works.
+# Caveat: normalization is alnum-lowercase + prefix match, so it can
+# mismatch on boards with a connector name that's a strict prefix of
+# another (e.g. "DP" vs "DPI" - "dpi1" would match "dp"* first). Not an
+# issue on this board (hdmia/dsi share no such prefix relationship).
 _canon_output() {
     local target="$1"
     [ -z "${target}" ] && return 1
