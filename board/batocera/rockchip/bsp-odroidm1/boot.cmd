@@ -66,7 +66,7 @@ setenv partition ${bootpart}
 # and contains a single "display_bootarg=video=<connector>:d" line, or is
 # absent if nothing should be disabled. Loaded into fdt_addr_r as scratch
 # space - the real FDT load right below overwrites it immediately after.
-if load ${devtype} ${devnum}:${partition} ${fdt_addr_r} ${prefix}boot/display-bootarg.txt; then
+if load ${devtype} ${devnum}:${partition} ${fdt_addr_r} ${prefix}display-bootarg.txt; then
     env import -t ${fdt_addr_r} ${filesize}
     setenv bootargs "${bootargs} ${display_bootarg}"
 fi
