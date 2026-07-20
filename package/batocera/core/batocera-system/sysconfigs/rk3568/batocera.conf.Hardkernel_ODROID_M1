@@ -30,10 +30,11 @@ global.videooutput2=none
 system.cpu.governor=interactive
 
 # VU8M is a portrait-mounted panel; rotate for landscape UI when it's used
-# as an output. Enumerates as DSI-1 under labwc (confirmed live on device).
+# as an output. Enumerates as DSI-1 (DRM/KMSDRM connector name, confirmed
+# live via batocera-resolution.drm's listOutputs).
 # NOTE: rotation direction (1=90 vs 3=270) not yet verified live with this
 # patch - candidate value, adjust with `batocera-settings-set
 # display.rotate.DSI-1 <0-3>` on device if it comes up mirrored/upside down.
 display.rotate.DSI-1=1
-# DRM rotation, for the splash screen (early boot, before labwc starts)
+# DRM rotation, for the splash screen (early boot, before ES starts)
 display.rotate.DSI=1
