@@ -66,19 +66,33 @@ case "${ACTION}" in
                             amixer -c 0 cset name='Playback Path' SPK
                             ;;
                         "rk3568")
-                            # ODROID-M1: two independent outputs (HDMI + VU8M
-                            # DSI panel). Follow whichever one is the active
-                            # display (global.videooutput) so audio doesn't
-                            # default to a screen nobody is looking at.
-                            case "$(/usr/bin/batocera-settings-get-master global.videooutput)" in
-                                "DSI-1")
-                                    MODE=alsa_output._sys_devices_platform_rk809-sound_sound_card0.stereo-fallback
-                                    ;;
-                                *)
-                                    MODE=alsa_output._sys_devices_platform_hdmi-sound_sound_card1.stereo-fallback
-                                    ;;
-                            esac
-                            LC_ALL=C pactl set-default-sink "${MODE}" || exit 1
+                            # "rk3568" is the shared arch for every board in
+                            # this family (rock-3a, several anbernic/orangepi
+                            # boards, ...), not just ours - the rk809 codec
+                            # and the HDMI sink's sysfs-path-based name below
+                            # are specific to the ODROID-M1's hardware/DTB
+                            # and don't hold for the others (no rk809 sound
+                            # card there, HDMI sink name likely differs).
+                            # Scope to our board via batocera.board (same
+                            # mechanism the "ogu" check above uses) so this
+                            # doesn't break `set auto` on every other rk3568
+                            # board.
+                            if [[ "$BOARD" == "bsp-odroidm1" ]]; then
+                                # Two independent outputs (HDMI + VU8M DSI
+                                # panel). Follow whichever one is the active
+                                # display (global.videooutput) so audio
+                                # doesn't default to a screen nobody is
+                                # looking at.
+                                case "$(/usr/bin/batocera-settings-get-master global.videooutput)" in
+                                    "DSI-1")
+                                        MODE=alsa_output._sys_devices_platform_rk809-sound_sound_card0.stereo-fallback
+                                        ;;
+                                    *)
+                                        MODE=alsa_output._sys_devices_platform_hdmi-sound_sound_card1.stereo-fallback
+                                        ;;
+                                esac
+                                LC_ALL=C pactl set-default-sink "${MODE}" || exit 1
+                            fi
                             ;;
                         *)
                             # do nothing!
