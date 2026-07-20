@@ -154,6 +154,22 @@ mixer $card 'HDMI CTRL SRC' 'I2S'
 # Odroid Go Advance Speaker
 mixer $card 'Playback Path' 'SPK'
 
+# ODROID-M1 rk817-codec (RK809 PMIC audio): the ALSA control reports
+# "Limits: Playback 0 - 255" but the kernel driver only actually accepts
+# up to 252 (confirmed via dmesg: "rk817_dac_vol_put: Volume out of range
+# [0, 252]"). The generic "mixer $card DAC 100%" above silently fails on
+# this board since 100% maps to the (invalid) top of the reported range,
+# leaving playback stuck at whatever the driver's power-on default is
+# (~80%, -20dB) regardless of what PipeWire's own volume shows. Called
+# directly (not via the mixer() helper) since DAC is volume-only - the
+# helper's default trailing "on" switch arg makes amixer reject the whole
+# command, confirmed live with `bash -x`.
+case ${BOARD} in
+    *odroidm1*)
+      amixer -c $card sset DAC 252,252 >/dev/null 2>&1
+      ;;
+esac
+
 # ES8316 headphone jack
 mixer $card 'Right Headphone Mixer Right DAC' on
 mixer $card 'Left Headphone Mixer Left DAC' on
