@@ -1,0 +1,47 @@
+#!/bin/sh
+#
+# ODROID-M1 has two independent, simultaneously-connected outputs (HDMI +
+# the VU8M DSI panel), but only one is ever actively rendered to (see
+# global.videooutput / emulationstation-standalone) - there's no compositor
+# post GBM/KMSDRM pivot to power the other one off. Left alone, the unused
+# panel just freezes on whatever the kernel/splash last drew to it.
+#
+# batocera-resolution's setOutput only stops apps from rendering to the
+# other connector, it doesn't disable it, so the fix has to happen at the
+# kernel cmdline level (video=<connector>:d) - U-Boot reads this back out
+# of /boot/display-bootarg.txt on the *next* boot (see boot.cmd), so a
+# display switch here takes one reboot to fully apply.
+
+# Only recompute on shutdown/reboot, same convention as S65values4boot.
+[ "$1" = "stop" ] || exit 0
+
+BOOTARG_FILE="/boot/display-bootarg.txt"
+
+OUTPUT="$(/usr/bin/batocera-settings-get-master global.videooutput)"
+case "${OUTPUT}" in
+    "DSI-1")
+        DISABLE_CONN="HDMI-A-1"
+        ;;
+    "HDMI-A-1"|"")
+        DISABLE_CONN="DSI-1"
+        ;;
+    *)
+        # Unrecognized value - don't disable anything rather than guess wrong.
+        DISABLE_CONN=""
+        ;;
+esac
+
+NEW_CONTENT=""
+[ -n "${DISABLE_CONN}" ] && NEW_CONTENT="display_bootarg=video=${DISABLE_CONN}:d"
+
+if [ "$(cat "${BOOTARG_FILE}" 2>/dev/null)" != "${NEW_CONTENT}" ]; then
+    mount -o remount,rw /boot
+    if [ -n "${NEW_CONTENT}" ]; then
+        echo "${NEW_CONTENT}" > "${BOOTARG_FILE}"
+    else
+        rm -f "${BOOTARG_FILE}"
+    fi
+    mount -o remount,ro /boot
+fi
+
+exit 0

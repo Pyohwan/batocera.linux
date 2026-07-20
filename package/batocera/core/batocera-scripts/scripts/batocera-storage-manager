@@ -249,15 +249,23 @@ mount_partition() {
     # Check Content & Merge
     if [ -d "$MOUNT_POINT/roms" ]; then
         log_msg "VALID: [$PART_DEV] /roms found at $MOUNT_POINT"
-        
-        if [ "$IGNORE_AUTOMATION" = true ]; then
-            log_msg "INFO: [$PART_DEV] Drive ignored. Staying mounted at $MOUNT_POINT but skipping pool."
-            return 0
-        fi
-        
+
         local BRANCH_PATH="$MOUNT_POINT/roms"
         local CURRENT_CONFIG=$(batocera-settings-get -f "$BOOT_CONF_FILE" "$CONFIG_KEY")
 
+        # A partition already explicitly merged into the pool must keep
+        # re-applying on every boot regardless of a disk-wide ignore flag.
+        # ignore.drives is disk-scoped (get_unique_id works off the parent
+        # disk, not the partition), so a drive with several partitions -
+        # e.g. leftover OS installs alongside the real ROMs partition -
+        # ends up with the *whole disk* ignored once the user dismisses the
+        # junk ones, silently blocking the already-configured ROMs
+        # partition's merge on every subsequent boot too. Confirmed live on
+        # hardware: this is exactly why a 4-partition NVMe drive's ROMs
+        # partition stopped re-merging after a reboot even though its
+        # mergerfs.roms entry was still saved. Checking "already configured"
+        # before the ignore check preserves the ignore for anything the
+        # user hasn't explicitly opted into yet.
         if [[ "$CURRENT_CONFIG" == *"$BRANCH_PATH"* ]]; then
             local CLEAN_BRANCH="${BRANCH_PATH#/}"
             if mount | grep " $POOL_PATH " | grep -q "$CLEAN_BRANCH"; then
@@ -274,22 +282,27 @@ mount_partition() {
                 touch "/tmp/mergerfs.pending"
             fi
             return 2
-        else
-            [ -n "$PENDING_FLAG_PATH" ] && touch "$PENDING_FLAG_PATH"
-            # Gather data for the GUI prompt
-            local PART_NAME=$(basename "$PART_DEV")
-            local PARENT=$(get_parent_disk "$PART_NAME")
-            local MODEL=$(lsblk -d -n -o MODEL "/dev/$PARENT")
-            local SIZE=$(lsblk -d -n -o SIZE "$PART_DEV")
-            # Clean variables
-            local MODEL_CLEAN=$(echo "$MODEL" | tr ':' '_' | xargs)
-            local SIZE_CLEAN=$(echo "$SIZE" | tr ':' '_')
-            [ -z "$MODEL_CLEAN" ] && MODEL_CLEAN="Generic Drive"
-
-            local UNIQUE_ID=$(get_unique_id "$PARENT")
-            send_notification "REQUEST_MERGE:$PART_NAME:$MODEL_CLEAN:$SIZE_CLEAN:$MOUNT_POINT:$UNIQUE_ID"
-            return 2
         fi
+
+        if [ "$IGNORE_AUTOMATION" = true ]; then
+            log_msg "INFO: [$PART_DEV] Drive ignored. Staying mounted at $MOUNT_POINT but skipping pool."
+            return 0
+        fi
+
+        [ -n "$PENDING_FLAG_PATH" ] && touch "$PENDING_FLAG_PATH"
+        # Gather data for the GUI prompt
+        local PART_NAME=$(basename "$PART_DEV")
+        local PARENT=$(get_parent_disk "$PART_NAME")
+        local MODEL=$(lsblk -d -n -o MODEL "/dev/$PARENT")
+        local SIZE=$(lsblk -d -n -o SIZE "$PART_DEV")
+        # Clean variables
+        local MODEL_CLEAN=$(echo "$MODEL" | tr ':' '_' | xargs)
+        local SIZE_CLEAN=$(echo "$SIZE" | tr ':' '_')
+        [ -z "$MODEL_CLEAN" ] && MODEL_CLEAN="Generic Drive"
+
+        local UNIQUE_ID=$(get_unique_id "$PARENT")
+        send_notification "REQUEST_MERGE:$PART_NAME:$MODEL_CLEAN:$SIZE_CLEAN:$MOUNT_POINT:$UNIQUE_ID"
+        return 2
     fi
     return 0
 }

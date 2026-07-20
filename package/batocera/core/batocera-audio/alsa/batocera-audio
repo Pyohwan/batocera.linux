@@ -65,6 +65,21 @@ case "${ACTION}" in
                             LC_ALL=C pactl set-default-sink INTERNAL
                             amixer -c 0 cset name='Playback Path' SPK
                             ;;
+                        "rk3568")
+                            # ODROID-M1: two independent outputs (HDMI + VU8M
+                            # DSI panel). Follow whichever one is the active
+                            # display (global.videooutput) so audio doesn't
+                            # default to a screen nobody is looking at.
+                            case "$(/usr/bin/batocera-settings-get-master global.videooutput)" in
+                                "DSI-1")
+                                    MODE=alsa_output._sys_devices_platform_rk809-sound_sound_card0.stereo-fallback
+                                    ;;
+                                *)
+                                    MODE=alsa_output._sys_devices_platform_hdmi-sound_sound_card1.stereo-fallback
+                                    ;;
+                            esac
+                            LC_ALL=C pactl set-default-sink "${MODE}" || exit 1
+                            ;;
                         *)
                             # do nothing!
                             ;;
