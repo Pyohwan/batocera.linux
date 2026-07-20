@@ -17,6 +17,16 @@ global.videooutput=HDMI-A-1
 # global.videooutput naming HDMI-A-1 only).
 global.videooutput2=none
 
+# S18governor defaults to "schedutil" when this is unset (see
+# board/batocera/fsoverlay/etc/init.d/S18governor) - schedutil's reactive
+# ramp-up lags noticeably behind bursty UI load like ES menu scrolling,
+# confirmed live: FPS fluctuated 40-50 on schedutil vs. a clean, steady
+# ~55-60 after forcing "performance" (all 4 cores at max 1.99GHz) as a
+# live A/B test. This is a mains-powered console with no battery to
+# manage and plenty of thermal headroom (~43C under load) - no real
+# downside to always running at max frequency here.
+system.cpu.governor=performance
+
 # VU8M is a portrait-mounted panel; rotate for landscape UI when it's used
 # as an output. Enumerates as DSI-1 under labwc (confirmed live on device).
 # NOTE: rotation direction (1=90 vs 3=270) not yet verified live with this
