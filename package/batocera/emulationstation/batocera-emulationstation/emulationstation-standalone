@@ -266,7 +266,18 @@ while [ -e "${REBOOT_FLAG}" ]; do
     echo "Updated video outputs: ${settings_output}, ${settings_output2}, ${settings_output3}" >> $log
     ###################
 
-    _blank_unused_outputs
+    # DISABLED: even a single modetest -w ...:DPMS:... -d call is enough
+    # to make batocera-switch-screen-checker read it as a real display
+    # hotplug event, which sends ES a quit command to restart display
+    # configuration - which calls this again, forever. Confirmed live: ES
+    # stuck in an endless quit/relaunch loop with just this one call in
+    # place (no repeating watchdog needed to reproduce it). Needs a real
+    # fix (either make the checker ignore our own programmatic DPMS
+    # writes, or find a way to change DPMS without it looking like a
+    # hotplug at the uevent level) before this can come back - leaving
+    # the unused output visually on/frozen is a much smaller problem than
+    # ES being completely unable to start.
+    # _blank_unused_outputs
 
     # And now we can apply the setting per output...
     
@@ -495,20 +506,22 @@ while [ -e "${REBOOT_FLAG}" ]; do
     echo "Standalone: --- Launching EmulationStation ---" >> "$log"
     cd /userdata # ES need a PWD
 
-    # Something in ES/RetroArch's own KMSDRM usage keeps resetting DPMS
-    # back to On on every connector it touches (confirmed live: a single
-    # delayed re-apply a few seconds after launch got undone again just as
-    # fast - not a one-time reset at startup, it keeps happening). Rather
-    # than chase the exact trigger, just keep re-asserting it for as long
-    # as ES is running. Killed right after ES exits so it doesn't leak
-    # into the next loop iteration.
-    ( while true; do sleep 3; _blank_unused_outputs; done ) &
-    BLANK_WATCHDOG_PID=$!
+    # DISABLED: the repeating re-apply (every 3s) turned out to cause a
+    # much worse problem than the one it was working around. Each
+    # `modetest -w ... -d` cycle (grab DRM master, write the DPMS
+    # property, drop master) fires what batocera-switch-screen-checker
+    # reads as a real display hotplug event, which sends ES a quit
+    # command to restart display configuration - which re-triggers this
+    # same block, which fires another "hotplug", forever. Confirmed live:
+    # ES stuck in an endless quit/relaunch loop, reproduced even on
+    # HDMI-only (not specific to the VU8M switch that surfaced it). Back
+    # to a single application (still inside _blank_unused_outputs's own
+    # call further up, before ES launches) until this can be fixed
+    # properly - a genuine one-time reset by ES's own KMSDRM init is a far
+    # smaller problem than this loop.
 
     # DBUS is required for the gio/gvfs/trash:///...
     %BATOCERA_EMULATIONSTATION_PREFIX% dbus-run-session -- emulationstation ${GAMELAUNCHOPT} --exit-on-reboot-required %BATOCERA_EMULATIONSTATION_ARGS% ${CUSTOMESOPTIONS}
-
-    kill "${BLANK_WATCHDOG_PID}" 2>/dev/null
 
     if which batocera-backglass; then
         if [ -n "${settings_output2}" ]; then
