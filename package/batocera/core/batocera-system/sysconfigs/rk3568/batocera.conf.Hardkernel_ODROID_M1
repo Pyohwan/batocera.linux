@@ -9,6 +9,14 @@
 # batocera-resolution enumerates first, which is not guaranteed to be HDMI.
 global.videooutput=HDMI-A-1
 
+# HDMI and VU8M are mutually exclusive - one active display at a time, not
+# a dual-monitor setup. Without this, emulationstation-standalone's own
+# "if screen2 is empty, auto-pick one" fallback treats the unset second
+# slot as an invitation to light up VU8M alongside HDMI as a second active
+# output (confirmed live: DSI-1 got auto-selected and left DPMS-on despite
+# global.videooutput naming HDMI-A-1 only).
+global.videooutput2=none
+
 # VU8M is a portrait-mounted panel; rotate for landscape UI when it's used
 # as an output. Enumerates as DSI-1 under labwc (confirmed live on device).
 # NOTE: rotation direction (1=90 vs 3=270) not yet verified live with this

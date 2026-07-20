@@ -41,11 +41,4 @@ cp "${BOARD_DIR}/boot/extlinux.conf"       "${BATOCERA_BINARIES_DIR}/boot/extlin
 cp "${BOARD_DIR}/boot/boot.scr"            "${BATOCERA_BINARIES_DIR}/boot/"  || exit 1
 cp "${BOARD_DIR}/boot/boot-logo.bmp.gz"    "${BATOCERA_BINARIES_DIR}/boot/"  || exit 1
 
-# Matches the sysconfig default (global.videooutput=HDMI-A-1): disables
-# DSI-1 from the very first boot, before S66odroidm1display ever gets a
-# chance to compute/write this file itself on a shutdown. Without this, a
-# fresh flash shows both HDMI and VU8M lit until the first clean
-# shutdown/reboot regenerates it correctly.
-cp "${BOARD_DIR}/boot/display-bootarg.txt" "${BATOCERA_BINARIES_DIR}/boot/"  || exit 1
-
 exit 0

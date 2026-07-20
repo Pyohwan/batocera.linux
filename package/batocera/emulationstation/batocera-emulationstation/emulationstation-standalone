@@ -32,6 +32,69 @@ _wait_for_compositor() {
     return 1
 }
 
+# Resolves an output identifier to listOutputs' own canonical "N - NAME"
+# form, whatever format it was given in. global.videooutput-style values
+# ("HDMI-A-1", "DSI-1", matching /sys/class/drm/cardX-<name>) don't match
+# listOutputs' "0 - HDMIA" lines (NAME there comes from batocera-drminfo,
+# which drops the dashes/suffix) - every validation check below used to
+# compare those two formats directly and always fail, so a configured
+# global.videooutput was silently treated as invalid every time (falls
+# through the whole fallback chain, confirmed live via display.log:
+# "Invalid output - HDMI-A-1" even though HDMI-A-1 was in fact connected
+# and selectable). Canonicalizing once up front means every subsequent
+# exact-string comparison in this script (which already assumes
+# listOutputs' own format) just works.
+_canon_output() {
+    local target="$1"
+    [ -z "${target}" ] && return 1
+    local norm_target
+    norm_target=$(echo "${target}" | tr -cd '[:alnum:]' | tr '[:upper:]' '[:lower:]')
+    local line name norm_name
+    while IFS= read -r line; do
+        [ "${target}" = "${line}" ] && { echo "${line}"; return 0; }
+        name="${line#* - }"
+        norm_name=$(echo "${name}" | tr -cd '[:alnum:]' | tr '[:upper:]' '[:lower:]')
+        case "${norm_target}" in
+            "${norm_name}"*) echo "${line}"; return 0 ;;
+        esac
+    done < <(batocera-resolution listOutputs)
+    return 1
+}
+
+# Blanks any connected-but-unused output at the DRM level (DPMS off), and
+# makes sure the active one(s) are DPMS on. setOutput only stops us from
+# *rendering* to the unused output - on the "drm" resolution script type
+# (no compositor) nothing else owns that connector, so it's otherwise left
+# showing whatever was last drawn to it (typically the boot splash,
+# frozen). This is what a normal desktop's xrandr/wlr-randr --off does at
+# the display-server level; we do the DRM-object equivalent by hand since
+# there's no server here. No-op on single-output boards. Reads
+# settings_output/settings_output2/settings_output3 as globals (already
+# canonicalized to listOutputs' own "N - NAME" format by _canon_output).
+_blank_unused_outputs() {
+    command -v modetest >/dev/null 2>&1 || return 0
+    # NAME there is batocera-drminfo's abbreviated form ("HDMIA"/"DSI"),
+    # but modetest -c reports the sysfs-style connector name
+    # ("HDMI-A-1"/"DSI-1") - normalize both to alnum-lowercase and
+    # prefix-match, same approach as _canon_output.
+    local ACTIVE_NAMES="" o
+    for o in "${settings_output}" "${settings_output2}" "${settings_output3}"; do
+        [ -z "${o}" ] && continue
+        ACTIVE_NAMES="${ACTIVE_NAMES} $(echo "${o#* - }" | tr -cd '[:alnum:]' | tr '[:upper:]' '[:lower:]')"
+    done
+    local CONN_ID CONN_NAME norm_conn DPMS_VAL an
+    while read -r CONN_ID CONN_NAME; do
+        [ -z "${CONN_ID}" ] && continue
+        norm_conn=$(echo "${CONN_NAME}" | tr -cd '[:alnum:]' | tr '[:upper:]' '[:lower:]')
+        DPMS_VAL=3 # Off
+        for an in ${ACTIVE_NAMES}; do
+            case "${norm_conn}" in "${an}"*) DPMS_VAL=0; break ;; esac # On
+        done
+        echo "Standalone: DPMS ${DPMS_VAL} on connector ${CONN_ID} (${CONN_NAME})" >> "$log"
+        modetest -w "${CONN_ID}:DPMS:${DPMS_VAL}" -d >/dev/null 2>&1
+    done < <(modetest -c 2>/dev/null | awk '/^[0-9]+[[:space:]]+[0-9]+[[:space:]]+connected/ {print $1, $4}')
+}
+
 GAMELAUNCH=1
 while [ -e "${REBOOT_FLAG}" ]; do
     echo "Standalone: --- Top of display configuration loop ---" >> "$log"
@@ -111,31 +174,36 @@ while [ -e "${REBOOT_FLAG}" ]; do
 
     # Validate output 1
     if [ -n "${settings_output}" ]; then
-        if ! batocera-resolution listOutputs | grep -qE '^'"${settings_output}"'$'; then
+        canon=$(_canon_output "${settings_output}")
+        if [ -z "${canon}" ]; then
             echo "Standalone: Invalid output - ${settings_output}" >> $log
             settings_output=
+        else
+            settings_output="${canon}"
         fi
     fi
     # Validate output 2
     if [ -n "${settings_output2}" ]; then
-        if [ -z "${settings_output}" -o "${settings_output}" = "${settings_output2}" ]; then
+        canon=$(_canon_output "${settings_output2}")
+        if [ -z "${settings_output}" -o "${settings_output}" = "${canon}" ]; then
+            settings_output2=
+        elif [ -z "${canon}" ]; then
+            echo "Standalone: Invalid output - ${settings_output2}" >> $log
             settings_output2=
         else
-            if ! batocera-resolution listOutputs | grep -qE '^'"${settings_output2}"'$'; then
-                echo "Standalone: Invalid output - ${settings_output2}" >> $log
-                settings_output2=
-            fi
+            settings_output2="${canon}"
         fi
     fi
     # Validate output 3
     if [ -n "${settings_output3}" ]; then
-        if [ -z "${settings_output}" -o -z "${settings_output2}" -o "${settings_output}" = "${settings_output3}" -o "${settings_output2}" = "${settings_output3}" ]; then
+        canon=$(_canon_output "${settings_output3}")
+        if [ -z "${settings_output}" -o -z "${settings_output2}" -o "${settings_output}" = "${canon}" -o "${settings_output2}" = "${canon}" ]; then
+            settings_output3=
+        elif [ -z "${canon}" ]; then
+            echo "Standalone: Invalid output - ${settings_output3}" >> $log
             settings_output3=
         else
-            if ! batocera-resolution listOutputs | grep -qE '^'"${settings_output3}"'$'; then
-                echo "Standalone: Invalid output - ${settings_output3}" >> $log
-                settings_output3=
-            fi
+            settings_output3="${canon}"
         fi
     fi
 
@@ -145,8 +213,9 @@ while [ -e "${REBOOT_FLAG}" ]; do
     fi
 
     if [ -z "${settings_output}" ] && [ -n "${LAST_PRIMARY_SCREEN}" ]; then
-        if batocera-resolution listOutputs | grep -qE "^${LAST_PRIMARY_SCREEN}$"; then
-            settings_output="${LAST_PRIMARY_SCREEN}"
+        canon=$(_canon_output "${LAST_PRIMARY_SCREEN}")
+        if [ -n "${canon}" ]; then
+            settings_output="${canon}"
             echo "Standalone: Restored last primary video output - ${settings_output}" >> $log
         fi
     fi
@@ -155,9 +224,12 @@ while [ -e "${REBOOT_FLAG}" ]; do
         settings_output=$(batocera-resolution currentOutput)
         echo "Standalone: First video output defaulted to - ${settings_output}" >> $log
         # currentOutput may be unplugged after an event of type unplugging it (/var/run/switch_screen_request)
-        if ! batocera-resolution listOutputs | grep -qE "^${settings_output}$"; then
+        canon=$(_canon_output "${settings_output}")
+        if [ -z "${canon}" ]; then
             echo "Standalone: Default output '${settings_output}' not connected. Finding first available." >> "$log"
             settings_output=$(batocera-resolution listOutputs | head -1)
+        else
+            settings_output="${canon}"
         fi
     fi
     # If screen2 is empty, take the first one found which is not screen1
@@ -184,6 +256,8 @@ while [ -e "${REBOOT_FLAG}" ]; do
     fi
     echo "Updated video outputs: ${settings_output}, ${settings_output2}, ${settings_output3}" >> $log
     ###################
+
+    _blank_unused_outputs
 
     # And now we can apply the setting per output...
     
@@ -412,8 +486,20 @@ while [ -e "${REBOOT_FLAG}" ]; do
     echo "Standalone: --- Launching EmulationStation ---" >> "$log"
     cd /userdata # ES need a PWD
 
+    # Something in ES/RetroArch's own KMSDRM usage keeps resetting DPMS
+    # back to On on every connector it touches (confirmed live: a single
+    # delayed re-apply a few seconds after launch got undone again just as
+    # fast - not a one-time reset at startup, it keeps happening). Rather
+    # than chase the exact trigger, just keep re-asserting it for as long
+    # as ES is running. Killed right after ES exits so it doesn't leak
+    # into the next loop iteration.
+    ( while true; do sleep 3; _blank_unused_outputs; done ) &
+    BLANK_WATCHDOG_PID=$!
+
     # DBUS is required for the gio/gvfs/trash:///...
     %BATOCERA_EMULATIONSTATION_PREFIX% dbus-run-session -- emulationstation ${GAMELAUNCHOPT} --exit-on-reboot-required %BATOCERA_EMULATIONSTATION_ARGS% ${CUSTOMESOPTIONS}
+
+    kill "${BLANK_WATCHDOG_PID}" 2>/dev/null
 
     if which batocera-backglass; then
         if [ -n "${settings_output2}" ]; then

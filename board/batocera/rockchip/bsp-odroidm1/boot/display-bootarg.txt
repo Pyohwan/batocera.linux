@@ -1,1 +1,0 @@
-display_bootarg=video=DSI-1:d
