@@ -57,6 +57,24 @@ setenv partition ${bootpart}
 
 #setenv bootargs "${bootargs} video=HDMI-A-1:${resolution}@${refresh}"
 
+# VU8M (the DSI companion panel) is off by default (fdtfile above already
+# points at the DTB without its overlay). /boot/vu8m.enabled is a
+# single-byte marker file ('1' or '0') that always ships in every image -
+# if its first byte is '1', switch to the DTB variant with the VU8M
+# overlay baked in instead. Deliberately not a config.ini-style parse and
+# not a `test -e` existence check: both proved unreliable in this board's
+# non-standard boot chain in an earlier attempt (this script gets
+# `source`d from within Hardkernel's own recovery/petitboot stage, not
+# run as a plain top-level U-Boot autoboot target - existence checks and
+# `env import`-after-`load` both misbehaved there, see project history).
+# `load` for an always-existing named file is the same already-reliable
+# pattern used for kernel/fdt/initrd below, and `itest.b` reads the
+# loaded byte straight out of memory without touching ${filesize} at all.
+load ${devtype} ${devnum}:${partition} ${ramdisk_addr_r} ${prefix}boot/vu8m.enabled
+if itest.b *${ramdisk_addr_r} == 0x31; then
+    setenv fdtfile "rk3568-odroid-m1-vu8m.dtb"
+fi
+
 load ${devtype} ${devnum}:${partition} ${fdt_addr_r} ${prefix}boot/${fdtfile}
 fdt addr ${fdt_addr_r}
 
