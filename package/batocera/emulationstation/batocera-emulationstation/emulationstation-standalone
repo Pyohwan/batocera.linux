@@ -65,40 +65,6 @@ _canon_output() {
     return 1
 }
 
-# Blanks any connected-but-unused output at the DRM level (DPMS off), and
-# makes sure the active one(s) are DPMS on. setOutput only stops us from
-# *rendering* to the unused output - on the "drm" resolution script type
-# (no compositor) nothing else owns that connector, so it's otherwise left
-# showing whatever was last drawn to it (typically the boot splash,
-# frozen). This is what a normal desktop's xrandr/wlr-randr --off does at
-# the display-server level; we do the DRM-object equivalent by hand since
-# there's no server here. No-op on single-output boards. Reads
-# settings_output/settings_output2/settings_output3 as globals (already
-# canonicalized to listOutputs' own "N - NAME" format by _canon_output).
-_blank_unused_outputs() {
-    command -v modetest >/dev/null 2>&1 || return 0
-    # NAME there is batocera-drminfo's abbreviated form ("HDMIA"/"DSI"),
-    # but modetest -c reports the sysfs-style connector name
-    # ("HDMI-A-1"/"DSI-1") - normalize both to alnum-lowercase and
-    # prefix-match, same approach as _canon_output.
-    local ACTIVE_NAMES="" o
-    for o in "${settings_output}" "${settings_output2}" "${settings_output3}"; do
-        [ -z "${o}" ] && continue
-        ACTIVE_NAMES="${ACTIVE_NAMES} $(echo "${o#* - }" | tr -cd '[:alnum:]' | tr '[:upper:]' '[:lower:]')"
-    done
-    local CONN_ID CONN_NAME norm_conn DPMS_VAL an
-    while read -r CONN_ID CONN_NAME; do
-        [ -z "${CONN_ID}" ] && continue
-        norm_conn=$(echo "${CONN_NAME}" | tr -cd '[:alnum:]' | tr '[:upper:]' '[:lower:]')
-        DPMS_VAL=3 # Off
-        for an in ${ACTIVE_NAMES}; do
-            case "${norm_conn}" in "${an}"*) DPMS_VAL=0; break ;; esac # On
-        done
-        echo "Standalone: DPMS ${DPMS_VAL} on connector ${CONN_ID} (${CONN_NAME})" >> "$log"
-        modetest -w "${CONN_ID}:DPMS:${DPMS_VAL}" -d >/dev/null 2>&1
-    done < <(modetest -c 2>/dev/null | awk '/^[0-9]+[[:space:]]+[0-9]+[[:space:]]+connected/ {print $1, $4}')
-}
-
 GAMELAUNCH=1
 while [ -e "${REBOOT_FLAG}" ]; do
     echo "Standalone: --- Top of display configuration loop ---" >> "$log"
@@ -270,18 +236,18 @@ while [ -e "${REBOOT_FLAG}" ]; do
     echo "Updated video outputs: ${settings_output}, ${settings_output2}, ${settings_output3}" >> $log
     ###################
 
-    # DISABLED: even a single modetest -w ...:DPMS:... -d call is enough
-    # to make batocera-switch-screen-checker read it as a real display
-    # hotplug event, which sends ES a quit command to restart display
-    # configuration - which calls this again, forever. Confirmed live: ES
-    # stuck in an endless quit/relaunch loop with just this one call in
-    # place (no repeating watchdog needed to reproduce it). Needs a real
-    # fix (either make the checker ignore our own programmatic DPMS
-    # writes, or find a way to change DPMS without it looking like a
-    # hotplug at the uevent level) before this can come back - leaving
-    # the unused output visually on/frozen is a much smaller problem than
-    # ES being completely unable to start.
-    # _blank_unused_outputs
+    # A previous approach here (DPMS-blanking any connected-but-unused
+    # output via modetest, to hide it rather than leave it frozen on the
+    # boot splash) was tried and abandoned: it fought with
+    # batocera-switch-screen-checker's hotplug detection (every write read
+    # as a real hotplug, triggering an ES quit/relaunch loop) and, once
+    # that was fixed, got silently undone again by ES's own screensaver
+    # every ~5 minutes. Root-caused instead of worked around: the unused
+    # output only needs hiding at all because our board unconditionally
+    # probes the VU8M DSI panel regardless of whether it's wanted. Fixed
+    # at the source in boot.cmd (see /boot/vu8m.enabled) - when VU8M isn't
+    # opted into, the kernel never probes it, so there's no second
+    # connector left to hide.
 
     # And now we can apply the setting per output...
     
@@ -509,20 +475,6 @@ while [ -e "${REBOOT_FLAG}" ]; do
 
     echo "Standalone: --- Launching EmulationStation ---" >> "$log"
     cd /userdata # ES need a PWD
-
-    # DISABLED: the repeating re-apply (every 3s) turned out to cause a
-    # much worse problem than the one it was working around. Each
-    # `modetest -w ... -d` cycle (grab DRM master, write the DPMS
-    # property, drop master) fires what batocera-switch-screen-checker
-    # reads as a real display hotplug event, which sends ES a quit
-    # command to restart display configuration - which re-triggers this
-    # same block, which fires another "hotplug", forever. Confirmed live:
-    # ES stuck in an endless quit/relaunch loop, reproduced even on
-    # HDMI-only (not specific to the VU8M switch that surfaced it). Back
-    # to a single application (still inside _blank_unused_outputs's own
-    # call further up, before ES launches) until this can be fixed
-    # properly - a genuine one-time reset by ES's own KMSDRM init is a far
-    # smaller problem than this loop.
 
     # DBUS is required for the gio/gvfs/trash:///...
     %BATOCERA_EMULATIONSTATION_PREFIX% dbus-run-session -- emulationstation ${GAMELAUNCHOPT} --exit-on-reboot-required %BATOCERA_EMULATIONSTATION_ARGS% ${CUSTOMESOPTIONS}
