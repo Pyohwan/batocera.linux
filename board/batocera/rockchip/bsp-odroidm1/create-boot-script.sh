@@ -64,16 +64,31 @@ cp "${BOARD_DIR}/overlays/display_vu8m.dtbo" "${BATOCERA_BINARIES_DIR}/boot/boot
 cp "${BOARD_DIR}/boot/extlinux.conf"       "${BATOCERA_BINARIES_DIR}/boot/extlinux/" || exit 1
 cp "${BOARD_DIR}/boot/boot-logo.bmp.gz"    "${BATOCERA_BINARIES_DIR}/boot/"  || exit 1
 
-# Separate file (not just a copy of extlinux.conf), an attempt to get
-# this SD card listed by name in the on-board SPI-NOR Petitboot menu.
-# Upstream Petitboot's syslinux-parser looks for a file literally named
-# "syslinux.cfg" (not "extlinux.conf") and matches directives via
-# case-sensitive strcmp against lowercase literals, so this is a
-# lowercase copy of extlinux.conf's content rather than the file itself.
-# Still not sufficient on its own as of this writing - see
-# package/batocera/boot/uboot-odroid-m1/BUILD-NOTES.md's "Petitboot
-# auto-discovery investigation" section for the full story and current
-# status. Left in place since it's harmless either way.
+# boot.scr: what makes this card visible in the on-board SPI-NOR
+# Petitboot menu. Petitboot's parser (pb-discover -> uboot-parser)
+# understands U-Boot boot scripts and grub.cfg but NOT extlinux.conf -
+# straight from the ODROID-M1 Petitboot author on the ODROID forum
+# (t=44346: "extlinux.conf is not supported by Petitboot, you need to add
+# boot.scr"). Our own boot chain does not use this file at all (mainline
+# U-Boot boots via extlinux.conf, and distro-boot tries extlinux before
+# boot scripts); it exists purely as something for Petitboot to find.
+# Compiled here rather than shipped as a committed binary so it can never
+# drift out of sync with boot.cmd - which is exactly what happened before:
+# boot.cmd was believed to be dead code and deleted, silently taking
+# Petitboot discovery with it. See boot.cmd's own header comment and
+# package/batocera/boot/uboot-odroid-m1/BUILD-NOTES.md for the full story.
+# Path is the boot partition's root, matching both Hardkernel's own
+# flash-kernel layout and vanilla Batocera's (which did get listed).
+"${HOST_DIR}/bin/mkimage" -A arm64 -T script -C none \
+	-d "${BOARD_DIR}/boot.cmd" \
+	"${BATOCERA_BINARIES_DIR}/boot/boot.scr" || exit 1
+
+# Kept alongside boot.scr: upstream Petitboot also has a syslinux parser
+# that wants a file literally named "syslinux.cfg" with lowercase
+# directives (its matching is case-sensitive strcmp, unlike U-Boot's own
+# extlinux parser). On its own this was NOT enough to get listed - hence
+# boot.scr above - but it costs nothing to keep and covers that parser
+# too if a given Petitboot build happens to include it.
 cp "${BOARD_DIR}/boot/syslinux.cfg"        "${BATOCERA_BINARIES_DIR}/boot/syslinux/syslinux.cfg" || exit 1
 
 exit 0
