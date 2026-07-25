@@ -21,6 +21,7 @@ cd "${BATOCERA_BINARIES_DIR}/build-uboot-odroid-m1/" && ./build-uboot.sh "${HOST
 mkdir -p "${BATOCERA_BINARIES_DIR}/boot/boot"          || exit 1
 mkdir -p "${BATOCERA_BINARIES_DIR}/boot/boot/overlays" || exit 1
 mkdir -p "${BATOCERA_BINARIES_DIR}/boot/extlinux"      || exit 1
+mkdir -p "${BATOCERA_BINARIES_DIR}/boot/syslinux"      || exit 1
 
 cp "${BINARIES_DIR}/Image"                  "${BATOCERA_BINARIES_DIR}/boot/boot/linux"                || exit 1
 cp "${BINARIES_DIR}/initrd.lz4"             "${BATOCERA_BINARIES_DIR}/boot/boot/initrd.lz4"            || exit 1
@@ -62,5 +63,17 @@ cp "${BOARD_DIR}/overlays/display_vu8m.dtbo" "${BATOCERA_BINARIES_DIR}/boot/boot
 
 cp "${BOARD_DIR}/boot/extlinux.conf"       "${BATOCERA_BINARIES_DIR}/boot/extlinux/" || exit 1
 cp "${BOARD_DIR}/boot/boot-logo.bmp.gz"    "${BATOCERA_BINARIES_DIR}/boot/"  || exit 1
+
+# Separate file (not just a copy of extlinux.conf), an attempt to get
+# this SD card listed by name in the on-board SPI-NOR Petitboot menu.
+# Upstream Petitboot's syslinux-parser looks for a file literally named
+# "syslinux.cfg" (not "extlinux.conf") and matches directives via
+# case-sensitive strcmp against lowercase literals, so this is a
+# lowercase copy of extlinux.conf's content rather than the file itself.
+# Still not sufficient on its own as of this writing - see
+# package/batocera/boot/uboot-odroid-m1/BUILD-NOTES.md's "Petitboot
+# auto-discovery investigation" section for the full story and current
+# status. Left in place since it's harmless either way.
+cp "${BOARD_DIR}/boot/syslinux.cfg"        "${BATOCERA_BINARIES_DIR}/boot/syslinux/syslinux.cfg" || exit 1
 
 exit 0
