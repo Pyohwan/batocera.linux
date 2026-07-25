@@ -79,15 +79,17 @@ case "${ACTION}" in
                             # board.
                             if [[ "$BOARD" == "bsp-odroidm1" ]]; then
                                 # VU8M (DSI-1) only exists in DRM at all when
-                                # /boot/vu8m.enabled opted into the overlay at
-                                # boot (see boot.cmd) - when it's off, the
-                                # kernel never probes the DSI panel, so there's
-                                # no "wrong" state to follow here, just HDMI.
-                                # Checking live DRM state (rather than re-
-                                # reading a config value) keeps this in sync
-                                # with whatever actually got probed, with one
-                                # source of truth instead of two that could
-                                # drift apart.
+                                # U-Boot applied the display_vu8m overlay at
+                                # boot (extlinux.conf's FDTOVERLAYS line,
+                                # present only in the "batocera-vu8m" LABEL -
+                                # see boot/extlinux.conf) - when it's not
+                                # applied, the kernel never probes the DSI
+                                # panel, so there's no "wrong" state to follow
+                                # here, just HDMI. Checking live DRM state
+                                # (rather than re-reading a config value)
+                                # keeps this in sync with whatever actually
+                                # got probed, with one source of truth
+                                # instead of two that could drift apart.
                                 if modetest -c 2>/dev/null | grep -q "DSI-1"; then
                                         MODE=alsa_output._sys_devices_platform_rk809-sound_sound_card0.stereo-fallback
                                 else
