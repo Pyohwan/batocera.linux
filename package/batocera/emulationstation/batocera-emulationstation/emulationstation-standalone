@@ -245,7 +245,8 @@ while [ -e "${REBOOT_FLAG}" ]; do
     # every ~5 minutes. Root-caused instead of worked around: the unused
     # output only needs hiding at all because our board unconditionally
     # probes the VU8M DSI panel regardless of whether it's wanted. Fixed
-    # at the source in boot.cmd (see /boot/vu8m.enabled) - when VU8M isn't
+    # at the source in U-Boot (see boot/extlinux.conf's FDTOVERLAYS line,
+    # present only in the "batocera-vu8m" LABEL) - when VU8M isn't
     # opted into, the kernel never probes it, so there's no second
     # connector left to hide.
 
