@@ -58,12 +58,9 @@ cp "${BINARIES_DIR}/rufomaculata"           "${BATOCERA_BINARIES_DIR}/boot/boot/
 	"${BOARD_DIR}/overlays/spi0.dtbo" \
 	|| exit 1
 
-# Ship the VU8M overlay unmerged, for boot.cmd to conditionally `fdt apply`
-# at boot time based on config.ini's `overlays=` line.
 cp "${BOARD_DIR}/overlays/display_vu8m.dtbo" "${BATOCERA_BINARIES_DIR}/boot/boot/overlays/display_vu8m.dtbo" || exit 1
 
 cp "${BOARD_DIR}/boot/extlinux.conf"       "${BATOCERA_BINARIES_DIR}/boot/extlinux/" || exit 1
-cp "${BOARD_DIR}/boot/boot.scr"            "${BATOCERA_BINARIES_DIR}/boot/"  || exit 1
 cp "${BOARD_DIR}/boot/boot-logo.bmp.gz"    "${BATOCERA_BINARIES_DIR}/boot/"  || exit 1
 
 exit 0
