@@ -62,63 +62,38 @@ cp u-boot.itb /path/to/batocera.linux/package/batocera/boot/uboot-odroid-m1/u-bo
   blob's FAT driver could only reliably read files written by mtools at
   image-build time.
 
-## Petitboot auto-discovery investigation (2026-07-25, not yet solved)
+## Petitboot interoperability (resolved 2026-07-25)
 
-A separate, real Hardkernel-fork build of `u-boot.itb`
-(`github.com/hardkernel/u-boot`, branch `odroidm1-v2017.09`, built via
-their `./make.sh odroid_rk3568` wrapper) was tried specifically to get
-this SD card to show up as a boot option in the on-board SPI-NOR
-Petitboot menu. It built and booted fine (confirmed via matching ATF
-component SHA256 hashes against a real SPI-NOR boot), and does carry
-`board/hardkernel/odroid-common/board.c`'s `rk_board_late_init()`
-(chain-loads a Petitboot `boot.scr` from SPI-NOR flash on every boot
-unless `skip_spiboot=true`) - but this turned out to be irrelevant to
-Petitboot's own device-scan, which runs entirely independently in SPI-NOR
-regardless of what U-Boot the SD card itself ships. It was **reverted
-back to this mainline build** - no upside for the added risk (this
-board.c also introduced a real regression: with a default env, the SD's
-own kernel never got a chance to run at all, because the vendor's own
-`boot.scr` unconditionally kexecs its embedded 4.19.206 recovery kernel
-instead of falling through to `distro_bootcmd`).
+A Hardkernel-fork build of `u-boot.itb` (`github.com/hardkernel/u-boot`,
+branch `odroidm1-v2017.09`, via their `./make.sh odroid_rk3568` wrapper)
+was tried in the hope that its board-specific `rk_board_late_init()`
+SPI-NOR chain-load would make this card visible in the SPI-NOR Petitboot
+menu. It built and booted (confirmed by matching ATF component hashes
+against a real SPI-NOR boot), but turned out to be irrelevant: Petitboot's
+device scan runs entirely on its own in SPI-NOR, independent of whatever
+U-Boot the SD card ships. Worse, that board.c unconditionally chain-loads
+its embedded 4.19.206 recovery kernel, so the card's own kernel never got
+to run. **Reverted to the mainline build documented above.**
 
-Root cause for why Petitboot doesn't list this card, as far as we got:
-real upstream Petitboot (`open-power/petitboot`) has a
-`discover/syslinux-parser.c` that looks for a file literally named
-`syslinux.cfg` (not `extlinux.conf`) at `/syslinux/syslinux.cfg` and a
-couple other fixed paths - added here
-(`board/batocera/rockchip/bsp-odroidm1/boot/syslinux.cfg`, copied to that
-path by `create-boot-script.sh`). Its directive matching is also
-case-sensitive (`strcmp` against lowercase literals, no
-`tolower()`/`strcasecmp()` anywhere in the parser - confirmed by reading
-the source), so the file uses lowercase `label`/`linux`/`append` unlike
-our uppercase `extlinux.conf`. Confirmed via
-`/var/log/petitboot/pb-discover.log` on real hardware that Petitboot
-mounts our SD partition fine and does run its parsers on it ("trying
-parsers for mmcblk1p2"), but even with the correct filename, correct
-path, and correct (lowercase) syntax, it still resolves zero boot
-options - unlike every other partition on the same board (Ubuntu
-installs on NVMe/eMMC), which Petitboot lists correctly via some other
-mechanism we could not identify (no `grub.cfg`, no BLS
-`/boot/loader/entries/`, no `*.cmdline.sig` files exist on those
-partitions either, so it isn't obviously the grub2/BLS parser as
-tested against upstream's own parser sources).
+What actually made Petitboot list this card is in the board directory, not
+here - see `board/batocera/rockchip/bsp-odroidm1/boot.cmd` and the
+`genimage.cfg` comments. In short: Petitboot parses `boot.ini` /
+`boot.scr` / `kboot.conf` / `grub.cfg` and not `extlinux.conf`, its
+resource resolution mis-handles a `:<part>` suffix in the script's load
+commands, and it effectively needs the boot partition to be #1. All three
+had been broken by earlier commits on this branch that judged them dead
+from our own boot chain's perspective. Verified end to end on hardware:
+the card appears as "batocera.linux", kexecs into our 6.1 kernel, and
+direct SD boot still takes the `extlinux.conf` path with the VU8M toggle
+intact.
 
-Working hypothesis: Hardkernel's actual compiled Petitboot binary
-(source not published, request for access unanswered) most likely just
-doesn't include the syslinux/extlinux parser at all, or has it patched
-out - this is unverifiable without their source. The `syslinux.cfg` file
-is left in place regardless (harmless, and would start working for free
-if that hypothesis is wrong or a future Petitboot rebuild fixes it) but
-should not be assumed to work.
-
-Not pursued further: manual "New" entries in the Petitboot UI do work
-(confirmed live, including a full boot through to EmulationStation via
-kexec from the old 4.19 recovery kernel, tolerating a `ITS queue timeout`
-retry loop that stalls boot for a couple minutes but does not appear to
-be fatal) and Petitboot does have env-backed persistence for a
-remembered default device (`petitboot,bootdevs=`, `petitboot,write?=true`
-observed in the shared SPI-NOR U-Boot env) - but a from-scratch manual
-entry did not survive a subsequent reboot in testing, and this path was
-deliberately not pursued further as the primary solution per explicit
-project direction (manual/non-automatic registration treated as a last
-resort, not a real fix).
+Two things worth knowing if this area is ever touched again, both from
+Hardkernel's own Petitboot forum thread (archived under
+`~/odroid-forum-archives/`): `uboot-parser <path>` can be run by hand in
+the Petitboot shell to see how a script gets parsed, and inside
+Petitboot's U-Boot `test -e` always returns false, `env import -t`
+reports success without loading anything, and `${filesize}` stays 0 -
+which is the real explanation for a long stretch of marker-file debugging
+earlier in this project. `uboot-parser` itself is the one piece
+Hardkernel never published (its repo is gone), so its behaviour can only
+be probed empirically.
