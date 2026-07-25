@@ -82,10 +82,20 @@ here - see `board/batocera/rockchip/bsp-odroidm1/boot.cmd` and the
 resource resolution mis-handles a `:<part>` suffix in the script's load
 commands, and it effectively needs the boot partition to be #1. All three
 had been broken by earlier commits on this branch that judged them dead
-from our own boot chain's perspective. Verified end to end on hardware:
-the card appears as "batocera.linux", kexecs into our 6.1 kernel, and
-direct SD boot still takes the `extlinux.conf` path with the VU8M toggle
-intact.
+from our own boot chain's perspective.
+
+That last one collided with a separate, genuine SPL requirement: SPL
+locates U-Boot by GPT entry *name* ("uboot" - Hardkernel's wiki is right
+about this, an earlier UART reading that concluded otherwise was wrong),
+so that entry can't simply be dropped either. Both are satisfied at once
+by declaring the boot partition first in `genimage.cfg` - genimage numbers
+GPT entries by declaration order, not by on-disk offset - so the boot
+partition becomes GPT #1 for Petitboot while "uboot" keeps its own named
+entry (now #3) at its original offset for the SPL. Verified end to end on
+hardware, all three at once, in the same image: SPL finds `u-boot.itb` at
+GPT #3 fine, direct SD boot takes the `extlinux.conf` path with the VU8M
+toggle intact, and the card appears as "batocera.linux" in Petitboot and
+kexecs into our real 6.1 kernel.
 
 Two things worth knowing if this area is ever touched again, both from
 Hardkernel's own Petitboot forum thread (archived under
