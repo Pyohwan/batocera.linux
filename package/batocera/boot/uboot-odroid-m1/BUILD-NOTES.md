@@ -1,18 +1,15 @@
-# u-boot.itb provenance
+# u-boot-rockchip.bin provenance
 
-`u-boot.itb` - the **main-stage** U-Boot FIT image (ARM Trusted Firmware +
-U-Boot proper + FDT + a few auxiliary firmware blobs) - is built from
-upstream source by this package. It used to be a prebuilt binary committed
-straight into this directory, of unknown origin; figuring out what that
-thing even was cost this project a lot of time, which is the whole reason
-for the source build.
-
-`idbloader.img` is the one file here that is still a committed blob. It is
-Hardkernel's own SPL (`U-Boot SPL 2017.09`), it is the stage the boot ROM
-itself validates, and it is proven on this board - replacing it is the
-single change in this area that can leave the board unbootable, so it is
-deliberately left alone. Only the FIT image that this SPL loads at a fixed
-sector offset (8M) is built here.
+`u-boot-rockchip.bin` - SPL/idbloader and the main-stage U-Boot FIT image
+(ARM Trusted Firmware + U-Boot proper + FDT + a few auxiliary firmware
+blobs), concatenated at the offsets U-Boot's own build already computes -
+is built entirely from upstream source by this package. It used to be two
+files, `u-boot.itb` (built from source) plus a prebuilt `idbloader.img`
+blob of unknown origin committed straight into this directory; figuring
+out what that blob even was cost this project a lot of time, which is the
+whole reason for the source build in the first place. There is no
+committed blob left in this package at all now - matches
+`uboot-odroid-m1s`, which already did this.
 
 ## Source
 
