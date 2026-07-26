@@ -102,30 +102,34 @@ see "Toggling VU8M" below.
 
 **Booting without Petitboot** is still possible, on demand: run
 `fw_setenv skip_spiboot true` in the Petitboot shell and reboot, and the
-SPI-NOR U-Boot distro-boots straight off this card's `extlinux.conf` instead
-of starting Petitboot (`fw_setenv skip_spiboot false` reverts). This is a
+SPI-NOR U-Boot distro-boots straight off this card's `boot.scr` instead of
+starting Petitboot (`fw_setenv skip_spiboot false` reverts). This is a
 real, documented Hardkernel mechanism (same forum thread), not something
-added by this project.
+added by this project. There is deliberately no `extlinux.conf` on this
+card - distro-boot tries it before `boot.scr`, so having both would make
+this path silently skip the `config.ini` logic below instead of using it.
 
-**Toggling VU8M** works the same way on every boot path (Petitboot kexec,
-`skip_spiboot` distro-boot, and this project's own U-Boot on the rare
-occasion its GPT entry is re-added) because all of them load one fixed
-filename, `boot/rk3568-odroid-m1-active.dtb`, which `create-boot-script.sh`
-installs as a copy of the VU8M-merged DTB by default. To switch:
+**Toggling VU8M** is a single line in `/boot/config.ini` (`overlays=`),
+read the same way on every boot path (Petitboot kexec, `skip_spiboot`
+distro-boot, and this project's own U-Boot on the rare occasion its GPT
+entry is re-added) since all of them read the same `boot.scr`:
 
 ```
 mount -o remount,rw /boot
-cp /boot/rk3568-odroid-m1.dtb      /boot/rk3568-odroid-m1-active.dtb   # HDMI only
-cp /boot/rk3568-odroid-m1-vu8m.dtb /boot/rk3568-odroid-m1-active.dtb   # VU8M (default)
+vi /boot/config.ini   # comment out or clear overlays= for HDMI only
 reboot
 ```
 
-(a real copy, not a symlink - FAT32 has none). This replaces the
-`FDTOVERLAYS`/`DEFAULT`-label mechanism this project used before Petitboot
-was in the picture: that only ever covered the one boot path with a U-Boot
-recent enough to evaluate `FDTOVERLAYS` (this package's own mainline
-2026.04 build), which is neither Petitboot's kexec nor the SPI-NOR's
-Hardkernel 2017.09 used by `skip_spiboot`.
+This is the exact mechanism Hardkernel's own official Ubuntu image uses -
+confirmed by dumping and reading its real `boot.scr` off a live eMMC
+install: it loads `config.ini` with the `ini` command, then `fdt apply`s
+each name listed in `overlays=`. That Ubuntu install boots correctly with
+VU8M active through both Petitboot and `skip_spiboot`, on this exact
+board, which is what settled on this design over other options - see
+"Earlier approaches" below for what was tried and ruled out first.
+`CONFIG_CMD_INI` is enabled in this package's own mainline 2026.04 build
+too, so `ini` isn't a Hardkernel-only patch - it works the same way
+regardless of which of the three U-Boots actually executes `boot.scr`.
 
 ### Earlier approaches (kept for the record, not to be retried)
 
@@ -147,14 +151,33 @@ Hardkernel 2017.09 used by `skip_spiboot`.
   unconditionally chain-loads its embedded 4.19.206 recovery kernel, so the
   card's own kernel never ran. Reverted to the mainline build documented
   above.
+- **A second Petitboot menu entry** (VU8M vs. HDMI-only as separate boot
+  choices, one config file each) - see "A second menu entry" above.
+- **Pre-merging VU8M into a second, complete DTB**
+  (`rk3568-odroid-m1-active.dtb`), toggled by overwriting that one file over
+  SSH - built because `FDTOVERLAYS` in `extlinux.conf` only covered our own
+  U-Boot, and this sidestepped needing any boot path to understand overlays
+  at all. Worked, but was replaced once `config.ini` + `ini` + `fdt apply`
+  was confirmed to work identically on every path anyway (see "Toggling
+  VU8M" above), which does the same job without carrying two ~177K DTBs
+  instead of one DTB plus a ~3K overlay.
 
-Two things worth knowing if this area is ever touched again, both from
+Some things worth knowing if this area is ever touched again, all from
 Hardkernel's own Petitboot forum thread (archived under
 `~/odroid-forum-archives/`): `uboot-parser <path>` can be run by hand in
 the Petitboot shell to see how a script gets parsed, and inside
-Petitboot's U-Boot `test -e` always returns false, `env import -t`
-reports success without loading anything, and `${filesize}` stays 0 -
-which is the real explanation for a long stretch of marker-file debugging
-earlier in this project. `uboot-parser` itself is the one piece
-Hardkernel never published (its repo is gone), so its behaviour can only
-be probed empirically.
+Petitboot's U-Boot `test -e` always returns false, and `${filesize}` stays
+0 after a failed load - which is the real explanation for a long stretch
+of marker-file debugging earlier in this project. `uboot-parser` itself is
+the one piece Hardkernel never published (its repo is gone), so its
+behaviour can only be probed empirically. One distinction worth being
+careful about: `env import -t` (the generic uEnv.txt-style mechanism
+3rd-party OS images like CoreELEC use to read their own config.ini) is a
+*different* thing from the `ini` command Hardkernel's own images use, and
+only the former is documented as broken through Petitboot - multiple forum
+posts (e.g. rpineau, umiki) report `env import`-sourced settings being
+silently dropped when booting through Petitboot but applying fine when
+the card boots itself directly. `ini` is not documented as having this
+problem anywhere, and empirically doesn't: Hardkernel's own Ubuntu, which
+uses it, boots correctly with VU8M active through Petitboot on this exact
+board.

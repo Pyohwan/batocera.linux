@@ -1,18 +1,21 @@
 #
 # flash-kernel: bootscr.odroid-rk356x
 #
-# Compiled to boot.scr at build time (see create-boot-script.sh) and
-# shipped on the boot partition. This is NOT used by our own boot chain -
-# mainline U-Boot boots this board via /extlinux/extlinux.conf instead
-# (confirmed by UART: boot.scr is never sourced). Its only purpose is to
-# be found and parsed by the on-board SPI-NOR Petitboot, whose own parser
-# (pb-discover -> uboot-parser) understands U-Boot boot scripts and
-# grub.cfg but explicitly NOT extlinux.conf - per the ODROID-M1 Petitboot
-# author's own answer on the ODROID forum (thread t=44346: "extlinux.conf
-# is not supported by Petitboot, you need to add boot.scr"). That is what
-# makes this SD card show up as a boot option in the Petitboot menu at
-# all; without it Petitboot mounts and scans our boot partition and finds
-# nothing.
+# Compiled to boot.scr at build time (see create-boot-script.sh) and shipped
+# on the boot partition. This is the ONLY boot script on this card - see
+# "One script, not extlinux.conf" below for why extlinux.conf is gone.
+#
+# Read by three different things, all proven on hardware:
+#   - the on-board SPI-NOR Petitboot (kexec, via its closed-source
+#     uboot-parser - this is what makes the card show up as "batocera.linux"
+#     in its menu at all: Petitboot understands boot.ini/boot.scr/kboot.conf/
+#     grub.cfg, not extlinux.conf, per the ODROID-M1 Petitboot author's own
+#     answer on the ODROID forum, thread t=44346);
+#   - the SPI-NOR's real Hardkernel 2017.09 U-Boot, when `fw_setenv
+#     skip_spiboot true` makes it distro-boot straight off this card instead
+#     of starting Petitboot;
+#   - this project's own mainline 2026.04 U-Boot, on the rare occasion its
+#     GPT entry is re-added (see genimage.cfg).
 #
 # Written with literal paths and minimal variable use on purpose:
 # Petitboot's parser does not fully evaluate U-Boot variables, and
@@ -31,31 +34,60 @@
 # fine and created the "batocera.linux" option but logged "resource
 # depends on device /dev/mmcblk1p1" three times and then "boot option
 # mmcblk1p2#batocera.linux is unresolved". Dropping the colon is what
-# Armbian's own (Petitboot-compatible) boot.scr does too.
+# Armbian's own (Petitboot-compatible) boot.scr does too. (Hardkernel's own
+# real boot.scr for their Ubuntu image, dumped and inspected on real
+# hardware, uses "${devnum}:${partition}" and works fine through Petitboot
+# there - but that image's boot partition genuinely is GPT #1, same as ours
+# now, so the mismatch this avoids may no longer apply either way. Left as
+# the already-proven form rather than switched for no benefit.)
 #
-# VU8M: this menu entry is the board's ONLY Petitboot entry - shipping a
-# second boot script to offer an HDMI-only choice was tried and doesn't work:
-# Hardkernel's uboot-parser (closed source) only ever surfaced one of the two
-# as a menu item, confirmed live (a boot.scr + boot.ini pair produced a single
-# "batocera.linux" entry, not two). Its own author describes it on the ODROID
-# forum as scanning for "the boot script" per partition, singular - it isn't
-# upstream Petitboot's parser architecture, which does try every registered
-# parser. So VU8M on/off for THIS boot path, same as every other one, is
-# controlled by a single shared file: this loads
-# boot/rk3568-odroid-m1-active.dtb, which create-boot-script.sh installs as a
-# copy of the VU8M-merged DTB by default, and which a user can overwrite over
-# SSH (see BUILD-NOTES.md) to switch to the plain one instead - no rebuild,
-# no bootloader needs to understand overlays. HDMI is unaffected either way:
-# with a display connected, userspace picks HDMI as primary regardless, and
-# the DSI panel simply fails to probe when no VU8M panel is attached.
+# VU8M, one config file for every boot path: this script loads config.ini
+# via the "ini" command and applies whatever overlays it lists with "fdt
+# apply" - the exact mechanism Hardkernel's own official Ubuntu image uses
+# (dumped and inspected from a real ODROID-M1 eMMC install: its boot.scr
+# does "load ... config.ini && ini generic ${loadaddr}" then, for each name
+# in "${overlays}", loads that .dtbo and "fdt apply"s it). Confirmed live
+# that this Ubuntu boots correctly with VU8M active through BOTH Petitboot
+# and skip_spiboot - unlike the generic uEnv.txt-style "env import -t"
+# mechanism 3rd-party OSes like CoreELEC use, which multiple ODROID forum
+# users report Petitboot ignoring (t=33873 posts from rpineau and umiki:
+# overlays/args set via "env import" in config.ini are dropped when booting
+# through Petitboot, but do apply when the card boots itself directly).
+# "ini" is a different, Petitboot-supported command, not an alias for that.
+# CONFIG_CMD_INI is enabled in this project's own mainline 2026.04 build
+# too, so this isn't a Hardkernel-only patch.
+#
+# This replaced an earlier design that pre-merged VU8M into a second,
+# complete DTB (rk3568-odroid-m1-active.dtb) and had the user overwrite that
+# file to toggle it - built because FDTOVERLAYS in extlinux.conf only ever
+# covered the one boot path capable of reading it, and this was the fallback
+# once that was in scope. This ini+fdt-apply mechanism covers all the same
+# paths directly, so there's no longer a reason to carry two ~177K DTBs
+# instead of one DTB plus the ~3K overlay: to toggle now, edit one line in
+# /boot/config.ini and reboot.
+#
+# One script, not extlinux.conf: distro-boot tries extlinux.conf before
+# boot.scr, so keeping both would make skip_spiboot's real U-Boot silently
+# read extlinux.conf instead of the config.ini logic above (Petitboot itself
+# never looked at extlinux.conf either way). Hardkernel's own Ubuntu image
+# ships no extlinux.conf either, for the same reason.
 #
 
 setenv bootlabel "batocera.linux"
 
-setenv bootargs "initrd=/boot/initrd.lz4 label=BATOCERA rootwait quiet loglevel=0 console=tty3 console=ttyS2,1500000n8 earlycon=uart8250,mmio32,0xfe660000 pci=nomsi"
+load ${devtype} ${devnum} ${loadaddr} config.ini && ini generic ${loadaddr}
 
-load ${devtype} ${devnum} ${fdt_addr_r} boot/rk3568-odroid-m1-active.dtb
+load ${devtype} ${devnum} ${fdt_addr_r} boot/rk3568-odroid-m1.dtb
 fdt addr ${fdt_addr_r}
+
+if test "x${overlays}" != "x"; then
+	for overlay in ${overlays}; do
+		fdt resize 8192
+		load ${devtype} ${devnum} ${loadaddr} boot/overlays/${overlay}.dtbo && fdt apply ${loadaddr}
+	done
+fi
+
+setenv bootargs "initrd=/boot/initrd.lz4 label=BATOCERA rootwait quiet loglevel=0 console=tty3 console=ttyS2,1500000n8 earlycon=uart8250,mmio32,0xfe660000 pci=nomsi"
 
 load ${devtype} ${devnum} ${kernel_addr_r} boot/linux
 
