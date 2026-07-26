@@ -7,13 +7,40 @@ LOG="/tmp/resize.log"
 test "$1" != "start" && exit 0
 
 # Get the active console. If it fails, default to tty1 as a fallback.
-ACTIVE_TTY_PATH="/dev/tty$(fgconsole 2>/dev/null || echo /dev/tty1)"
+ACTIVE_TTY_PATH="/dev/tty$(fgconsole 2>/dev/null || echo 1)"
 echo "Detected active console: ${ACTIVE_TTY_PATH}" >> "$LOG"
 
 # true if triggers are not available or not set to do so
 if ! grep -qE '^[ ]*autoresize[ ]*=[ ]*true[ ]*$' "${BOOTCONF}" && ! grep -qE '^[ ]*format-internal[ ]*=' "${BOOTCONF}"; then
     exit 0
 fi
+
+# We're actually going to draw a dialog, so it needs somewhere real to land.
+# This runs early enough in boot (S02) that the console is still on the
+# "(S) dummy device" vtcon and nothing written to it reaches the physical
+# display yet - the DRM driver hasn't bound and switched fbcon over to a
+# real framebuffer (confirmed via dmesg on the ODROID-M1: "rockchip-drm
+# ... bound" and "Console: switching to colour frame buffer device" land
+# around 16s into boot, well after this script would otherwise already be
+# drawing). Wait for a vtconsole to actually report itself as a bound frame
+# buffer device before drawing anything; give up after a timeout so boards
+# without a DRM fbcon (or where it genuinely never binds) don't hang here.
+wait_for_fbcon() {
+    local waited=0
+    while [ "${waited}" -lt 100 ]; do
+        for vtcon in /sys/class/vtconsole/vtcon*; do
+            if [ -f "${vtcon}/bind" ] && [ "$(cat "${vtcon}/bind" 2>/dev/null)" = "1" ] \
+               && grep -qi "frame buffer" "${vtcon}/name" 2>/dev/null; then
+                echo "fbcon ready after ${waited}0ms (${vtcon})" >> "$LOG"
+                return 0
+            fi
+        done
+        sleep 0.1
+        waited=$((waited + 1))
+    done
+    echo "fbcon not ready after ${waited}0ms, proceeding anyway" >> "$LOG"
+}
+wait_for_fbcon
 
 # Remove the trigger(s)
 remove_trigger() {
