@@ -78,22 +78,24 @@ case "${ACTION}" in
                             # doesn't break `set auto` on every other rk3568
                             # board.
                             if [[ "$BOARD" == "bsp-odroidm1" ]]; then
-                                # VU8M (DSI-1) only exists in DRM at all when
-                                # U-Boot applied the display_vu8m overlay at
-                                # boot (extlinux.conf's FDTOVERLAYS line,
-                                # present only in the "batocera-vu8m" LABEL -
-                                # see boot/extlinux.conf) - when it's not
-                                # applied, the kernel never probes the DSI
-                                # panel, so there's no "wrong" state to follow
-                                # here, just HDMI. Checking live DRM state
-                                # (rather than re-reading a config value)
-                                # keeps this in sync with whatever actually
-                                # got probed, with one source of truth
-                                # instead of two that could drift apart.
-                                if modetest -c 2>/dev/null | grep -q "DSI-1"; then
-                                        MODE=alsa_output._sys_devices_platform_rk809-sound_sound_card0.stereo-fallback
-                                else
+                                # Follow HDMI's own DRM hotplug status rather
+                                # than whether the DSI/VU8M overlay happened
+                                # to be baked into this boot's DTB (config.ini's
+                                # overlays= - see boot.cmd). DSI panels have no
+                                # hotplug detection, so "DSI-1 present in DRM"
+                                # only ever reflected a build-time choice, not
+                                # whether a cable is actually plugged in - a
+                                # boot with no VU8M overlay and no HDMI cable
+                                # connected would still get routed to HDMI and
+                                # produce no sound. The internal speaker needs
+                                # no such check: it's a fixed onboard
+                                # component, always present whenever the board
+                                # is powered, so it's the correct default
+                                # whenever HDMI isn't actively connected.
+                                if modetest -c 2>/dev/null | awk -F'\t' '$4 ~ /^HDMI-A-1/ {print $3}' | grep -qx connected; then
                                         MODE=alsa_output._sys_devices_platform_hdmi-sound_sound_card1.stereo-fallback
+                                else
+                                        MODE=alsa_output._sys_devices_platform_rk809-sound_sound_card0.stereo-fallback
                                 fi
                                 LC_ALL=C pactl set-default-sink "${MODE}" || exit 1
                             fi
