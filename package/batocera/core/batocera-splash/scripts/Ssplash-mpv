@@ -208,6 +208,21 @@ do_videostart ()
     VOLUME=$(/usr/bin/batocera-settings-get audio.volume)
     batocera-audio setSystemVolume "${VOLUME}"
 
+    # ODROID-M1 rk809 DAC hardware volume gets the same treatment: soundconfig
+    # (udev-triggered on the sound card's own probe, well before PipeWire
+    # starts) already sets it to 252/255 - the highest value the driver
+    # actually accepts, see soundconfig's own comment - but PipeWire/ACP
+    # claiming the card later resets it back to the driver's power-on
+    # default (~80%, -20dB), same timing as the volume reset above just
+    # affecting the ALSA mixer element PipeWire's own volume sits on top of
+    # instead of PipeWire's software volume itself. Confirmed live: PipeWire
+    # volume alone showing 100% still sounded quiet with the DAC control
+    # stuck at 80% underneath.
+    if [ "$(cat /boot/boot/batocera.board 2>/dev/null)" = "bsp-odroidm1" ]; then
+        rk809_card=$(awk '/rockchiprk809co/ {print $1; exit}' /proc/asound/cards)
+        [ -n "${rk809_card}" ] && amixer -c "${rk809_card}" sset DAC 252,252 >/dev/null 2>&1
+    fi
+
     # On some systems, the graphics driver may take an extra moment to become fully
     # ready after detection. Check for a user-configurable delay.
     splash_delay=$(batocera-settings-get splash.delay)
