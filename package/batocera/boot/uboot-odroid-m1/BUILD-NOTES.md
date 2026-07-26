@@ -62,40 +62,91 @@ right. The only difference is 56 bytes in `u-boot` itself (plus the data
 offsets that shift behind it), which is the cross toolchain and build
 timestamp changing, not the source or the config.
 
-## Petitboot interoperability (resolved 2026-07-25)
+## Petitboot interoperability (resolved 2026-07-26)
 
-A Hardkernel-fork build of `u-boot.itb` (`github.com/hardkernel/u-boot`,
-branch `odroidm1-v2017.09`, via their `./make.sh odroid_rk3568` wrapper)
-was tried in the hope that its board-specific `rk_board_late_init()`
-SPI-NOR chain-load would make this card visible in the SPI-NOR Petitboot
-menu. It built and booted (confirmed by matching ATF component hashes
-against a real SPI-NOR boot), but turned out to be irrelevant: Petitboot's
-device scan runs entirely on its own in SPI-NOR, independent of whatever
-U-Boot the SD card ships. Worse, that board.c unconditionally chain-loads
-its embedded 4.19.206 recovery kernel, so the card's own kernel never got
-to run. **Reverted to the mainline build documented above.**
+This card now always boots through the on-board SPI-NOR Petitboot, listed as
+"batocera.linux", the same as vanilla Batocera's own `rk3568/odroid-m1`
+target and unlike this project's own earlier approach (see history below).
 
-What actually made Petitboot list this card is in the board directory, not
-here - see `board/batocera/rockchip/bsp-odroidm1/boot.cmd` and the
-`genimage.cfg` comments. In short: Petitboot parses `boot.ini` /
-`boot.scr` / `kboot.conf` / `grub.cfg` and not `extlinux.conf`, its
-resource resolution mis-handles a `:<part>` suffix in the script's load
-commands, and it effectively needs the boot partition to be #1. All three
-had been broken by earlier commits on this branch that judged them dead
-from our own boot chain's perspective.
+**Why it works at all**: `genimage.cfg`'s `uboot` partition is
+`in-partition-table = "no"` - the FIT still sits at its usual 8M offset, but
+there is no GPT entry named "uboot". The SPL (Hardkernel's own 2017.09,
+untouched) locates U-Boot by GPT entry *name*, so without one it prints
+`spl: partition error` and falls through to booting from SPI-NOR instead -
+which is exactly what makes the on-board Petitboot run and see this card.
+This is deliberate, and matches upstream Batocera's own `genimage.cfg` for
+this board, not a regression: a storage device that can boot itself always
+outranks Petitboot (Petitboot's own author says as much on the ODROID forum,
+t=44346, describing the fix for a similar case as removing the competing
+bootloader), so registering that GPT entry - which is what an earlier point
+on this branch did, in order to make direct SD boot possible - is exactly
+what would make the card boot itself and skip Petitboot.
 
-That last one collided with a separate, genuine SPL requirement: SPL
-locates U-Boot by GPT entry *name* ("uboot" - Hardkernel's wiki is right
-about this, an earlier UART reading that concluded otherwise was wrong),
-so that entry can't simply be dropped either. Both are satisfied at once
-by declaring the boot partition first in `genimage.cfg` - genimage numbers
-GPT entries by declaration order, not by on-disk offset - so the boot
-partition becomes GPT #1 for Petitboot while "uboot" keeps its own named
-entry (now #3) at its original offset for the SPL. Verified end to end on
-hardware, all three at once, in the same image: SPL finds `u-boot.itb` at
-GPT #3 fine, direct SD boot takes the `extlinux.conf` path with the VU8M
-toggle intact, and the card appears as "batocera.linux" in Petitboot and
-kexecs into our real 6.1 kernel.
+**Getting listed in the menu** at all needed three fixes together, all in
+the board directory - see `board/batocera/rockchip/bsp-odroidm1/boot.cmd`
+and the `genimage.cfg` comments for the full detail: Petitboot parses
+`boot.ini` / `boot.scr` / `kboot.conf` / `grub.cfg`, not `extlinux.conf`
+(the ODROID-M1 Petitboot author's own answer on the forum); its resource
+resolution mis-handles a `:<part>` suffix in a script's load commands; and
+it only ever finds a bootable OS on GPT entry #1, which the boot partition
+now is.
+
+**A second menu entry** (VU8M vs. HDMI-only, as two separate boot options)
+was tried and does not work: shipping both a `boot.scr` and a `boot.ini`
+produced a single "batocera.linux" entry, not two. Hardkernel's
+`uboot-parser` is closed source, but its own author describes it on the
+forum as scanning for "the boot script" per partition (singular) - it is not
+built the way upstream Petitboot's own parsers are (which do try every
+registered parser). So VU8M is controlled by a single shared file instead -
+see "Toggling VU8M" below.
+
+**Booting without Petitboot** is still possible, on demand: run
+`fw_setenv skip_spiboot true` in the Petitboot shell and reboot, and the
+SPI-NOR U-Boot distro-boots straight off this card's `extlinux.conf` instead
+of starting Petitboot (`fw_setenv skip_spiboot false` reverts). This is a
+real, documented Hardkernel mechanism (same forum thread), not something
+added by this project.
+
+**Toggling VU8M** works the same way on every boot path (Petitboot kexec,
+`skip_spiboot` distro-boot, and this project's own U-Boot on the rare
+occasion its GPT entry is re-added) because all of them load one fixed
+filename, `boot/rk3568-odroid-m1-active.dtb`, which `create-boot-script.sh`
+installs as a copy of the VU8M-merged DTB by default. To switch:
+
+```
+mount -o remount,rw /boot
+cp /boot/rk3568-odroid-m1.dtb      /boot/rk3568-odroid-m1-active.dtb   # HDMI only
+cp /boot/rk3568-odroid-m1-vu8m.dtb /boot/rk3568-odroid-m1-active.dtb   # VU8M (default)
+reboot
+```
+
+(a real copy, not a symlink - FAT32 has none). This replaces the
+`FDTOVERLAYS`/`DEFAULT`-label mechanism this project used before Petitboot
+was in the picture: that only ever covered the one boot path with a U-Boot
+recent enough to evaluate `FDTOVERLAYS` (this package's own mainline
+2026.04 build), which is neither Petitboot's kexec nor the SPI-NOR's
+Hardkernel 2017.09 used by `skip_spiboot`.
+
+### Earlier approaches (kept for the record, not to be retried)
+
+- **Registering U-Boot as a named GPT entry**, so this card could boot
+  itself directly - this project's own approach before the above. Petitboot
+  never got past this: with a storage device that can boot itself, boot ROM
+  always runs it and SPI-NOR is never reached, no matter what is on the
+  card. The instinct that it *should* be possible to have both was reasonable
+  and matches how a real bootloader with a proper boot-order setting could
+  behave, but the boot ROM here has no such setting - self-booting and
+  showing up in Petitboot's menu turned out to be genuinely exclusive.
+- **A Hardkernel-fork build of `u-boot.itb`**
+  (`github.com/hardkernel/u-boot`, branch `odroidm1-v2017.09`, via their
+  `./make.sh odroid_rk3568` wrapper), on the theory that its board-specific
+  `rk_board_late_init()` SPI-NOR chain-load would matter here. It built and
+  booted (ATF component hashes matched a real SPI-NOR boot), but turned out
+  irrelevant: Petitboot's device scan runs entirely on its own in SPI-NOR,
+  independent of whatever U-Boot the SD card ships. Worse, that board.c
+  unconditionally chain-loads its embedded 4.19.206 recovery kernel, so the
+  card's own kernel never ran. Reverted to the mainline build documented
+  above.
 
 Two things worth knowing if this area is ever touched again, both from
 Hardkernel's own Petitboot forum thread (archived under

@@ -33,18 +33,28 @@
 # mmcblk1p2#batocera.linux is unresolved". Dropping the colon is what
 # Armbian's own (Petitboot-compatible) boot.scr does too.
 #
-# VU8M note: Petitboot boots via kexec and has no equivalent of
-# extlinux.conf's FDTOVERLAYS, so this entry always uses the plain base
-# DTB - i.e. booting through the Petitboot menu is always HDMI-only. The
-# VU8M toggle (extlinux.conf's DEFAULT line) applies to direct SD boot,
-# which is the normal path anyway.
+# VU8M: this menu entry is the board's ONLY Petitboot entry - shipping a
+# second boot script to offer an HDMI-only choice was tried and doesn't work:
+# Hardkernel's uboot-parser (closed source) only ever surfaced one of the two
+# as a menu item, confirmed live (a boot.scr + boot.ini pair produced a single
+# "batocera.linux" entry, not two). Its own author describes it on the ODROID
+# forum as scanning for "the boot script" per partition, singular - it isn't
+# upstream Petitboot's parser architecture, which does try every registered
+# parser. So VU8M on/off for THIS boot path, same as every other one, is
+# controlled by a single shared file: this loads
+# boot/rk3568-odroid-m1-active.dtb, which create-boot-script.sh installs as a
+# copy of the VU8M-merged DTB by default, and which a user can overwrite over
+# SSH (see BUILD-NOTES.md) to switch to the plain one instead - no rebuild,
+# no bootloader needs to understand overlays. HDMI is unaffected either way:
+# with a display connected, userspace picks HDMI as primary regardless, and
+# the DSI panel simply fails to probe when no VU8M panel is attached.
 #
 
 setenv bootlabel "batocera.linux"
 
 setenv bootargs "initrd=/boot/initrd.lz4 label=BATOCERA rootwait quiet loglevel=0 console=tty3 console=ttyS2,1500000n8 earlycon=uart8250,mmio32,0xfe660000 pci=nomsi"
 
-load ${devtype} ${devnum} ${fdt_addr_r} boot/rk3568-odroid-m1.dtb
+load ${devtype} ${devnum} ${fdt_addr_r} boot/rk3568-odroid-m1-active.dtb
 fdt addr ${fdt_addr_r}
 
 load ${devtype} ${devnum} ${kernel_addr_r} boot/linux
