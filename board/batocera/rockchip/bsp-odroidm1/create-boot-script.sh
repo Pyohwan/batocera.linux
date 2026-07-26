@@ -34,12 +34,12 @@ cp "${BINARIES_DIR}/rufomaculata"           "${BATOCERA_BINARIES_DIR}/boot/boot/
 # boot time by U-Boot's own `FDTOVERLAYS` directive in extlinux.conf (see
 # boot/extlinux.conf - the FDTOVERLAYS line is only present in the
 # "batocera-vu8m" LABEL, selected via the file's DEFAULT line). This
-# requires package/batocera/boot/uboot-odroid-m1/u-boot.itb to be the
-# mainline U-Boot 2026.04 build (odroid-m1-rk3568_defconfig) - the
-# previously-shipped prebuilt blob had no FDTOVERLAYS support at all
-# (confirmed by testing: silently ignored, no error). SPL/idbloader.img
-# is untouched (still Hardkernel's own, already proven reliable on
-# hardware) - only the main-stage FIT image changed.
+# requires the main-stage U-Boot to be the mainline 2026.04 build
+# (odroid-m1-rk3568_defconfig), which package/batocera/boot/uboot-odroid-m1
+# now builds from source - the prebuilt blob that package used to ship had
+# no FDTOVERLAYS support at all (confirmed by testing: silently ignored, no
+# error). SPL/idbloader.img is untouched (still Hardkernel's own prebuilt,
+# already proven reliable on hardware) - only the main-stage FIT changed.
 # Baking VU8M in unconditionally is what caused a whole class of bugs this
 # project spent a long time on: HDMI is a plain always-on DT node (not
 # overlay-gated), so with VU8M's DSI panel also unconditionally probed,
