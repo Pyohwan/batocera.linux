@@ -79,6 +79,13 @@ BR2_PACKAGE_MALI_G52_ODROIDM1=y
 # Keep brotli selected explicitly so that dependency stays satisfied.
 BR2_PACKAGE_BROTLI=y
 
+# GameCube/Wii core - package/batocera/core/batocera-system/Config.in only
+# auto-selects this for x86_64/RK3588/S922X/RPi5-class targets (stronger
+# single-thread CPU than our A55), not RK3568 - forcing it on anyway since
+# we already have GC ROMs migrated and want to try it. Known to be
+# CPU-bound even on TOPST D3-G's stronger Cortex-A72 (~18fps).
+BR2_PACKAGE_LIBRETRO_DOLPHIN=y
+
 # Firmware
 BR2_PACKAGE_FIRMWARE_ARMBIAN=y
 
