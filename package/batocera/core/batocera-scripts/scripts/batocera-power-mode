@@ -40,6 +40,29 @@ set_governor() {
    done
 }
 
+# Set GPU devfreq governor, if one exists (name-matched, not hardcoded to a
+# specific SoC's devfreq node - e.g. Rockchip's is "fde60000.gpu", but this
+# also covers other boards whose GPU devfreq node happens to be named with
+# "gpu" in it). Falls back silently (no-op) if the requested governor isn't
+# in that node's available list, or there's no GPU devfreq node at all - a
+# board without devfreq or with a differently-named node just isn't affected.
+set_gpu_governor() {
+    local GOVERNOR_NAME=$1
+
+    for devfreq in /sys/class/devfreq/*gpu*; do
+        [ -e "$devfreq/governor" ] || continue
+        local AVAILABLE
+        AVAILABLE=$(cat "$devfreq/available_governors" 2>/dev/null)
+        if [[ " $AVAILABLE " =~ [[:space:]]${GOVERNOR_NAME}[[:space:]] ]]; then
+            local CURRENT
+            CURRENT=$(cat "$devfreq/governor" 2>/dev/null)
+            if [ "$CURRENT" != "$GOVERNOR_NAME" ]; then
+                echo "$GOVERNOR_NAME" > "$devfreq/governor" 2>/dev/null
+            fi
+        fi
+    done
+}
+
 # Check if requested EPP is available
 check_epp() {
     local PREFERENCE=$1
@@ -68,6 +91,8 @@ set_epp() {
 # Set system default
 set_default() {
     SYSTEM_GOVERNOR="$(/usr/bin/batocera-settings-get-master system.cpu.governor)"
+    SYSTEM_GPU_GOVERNOR="$(/usr/bin/batocera-settings-get-master system.gpu.governor)"
+    set_gpu_governor "${SYSTEM_GPU_GOVERNOR:-simple_ondemand}"
 
     if check_governor "$SYSTEM_GOVERNOR"; then
         set_governor "$SYSTEM_GOVERNOR"
@@ -89,6 +114,7 @@ handle_powermode() {
     case "$POWERMODE_NAME" in
         "highperformance")
             set_governor "performance"
+            set_gpu_governor "performance"
             if [ "$EPP_AVAILABLE" -eq 1 ]; then
                 if check_epp "performance"; then
                     set_epp "performance"
@@ -106,6 +132,7 @@ handle_powermode() {
             elif check_governor "powersave"; then
                 set_governor "powersave"
             fi
+            set_gpu_governor "simple_ondemand"
 
             # Handle EPP
             if [ "$EPP_AVAILABLE" -eq 1 ]; then
@@ -118,6 +145,7 @@ handle_powermode() {
             ;;
         "powersaver")
             set_governor "powersave"
+            set_gpu_governor "powersave"
             if [ "$EPP_AVAILABLE" -eq 1 ]; then
                 if check_epp "power"; then
                     set_epp "power"

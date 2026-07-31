@@ -29,6 +29,19 @@ global.videooutput2=none
 # edge, same measured responsiveness.
 system.cpu.governor=interactive
 
+# The interactive-vs-performance measurement above was ES menu scrolling
+# (light 2D load) - actual GPU-bound emulation is a different story. Live
+# A/B on N64 (mupen64plus+glide64mk2, GPU-bound OpenGL translation of the
+# TEV-equivalent pipeline): CPU was already pinned at max freq under
+# "interactive" (not the bottleneck), but GPU devfreq's default
+# "simple_ondemand" governor lagged behind load spikes - mid-60s%-to-70s%
+# of native speed with dips. Locking both CPU+GPU to the "performance"
+# governor during gameplay only (via the existing gameStart/gameStop
+# powermode_launch_hooks.sh mechanism, see batocera-power-mode's new
+# set_gpu_governor()) fixed it to mostly 90%+. Menu/idle still gets
+# "interactive" above - this only kicks in while a game is actually running.
+n64.powermode=highperformance
+
 # VU8M is a portrait-mounted panel; rotate for landscape UI when it's used
 # as an output. Two different lookup keys are needed because the two
 # consumers derive the connector identifier differently:
