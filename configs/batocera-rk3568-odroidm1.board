@@ -86,6 +86,14 @@ BR2_PACKAGE_BROTLI=y
 # CPU-bound even on TOPST D3-G's stronger Cortex-A72 (~18fps).
 BR2_PACKAGE_LIBRETRO_DOLPHIN=y
 
+# FBNeo core built from dsno/Zansword's Korean-patched fork (CRC-tolerant
+# driver patches for Korean-translated arcade ROMs, which the standard
+# libretro-fbneo core rejects on CRC32 mismatch) - registered as an
+# alternate "fbneo_korean" core alongside the standard one, same fbneo
+# system/ROM folder. See package/batocera/emulators/retroarch/libretro/
+# libretro-fbneo-korean/.
+BR2_PACKAGE_LIBRETRO_FBNEO_KOREAN=y
+
 # Firmware
 BR2_PACKAGE_FIRMWARE_ARMBIAN=y
 
