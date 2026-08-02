@@ -42,6 +42,28 @@ system.cpu.governor=interactive
 # "interactive" above - this only kicks in while a game is actually running.
 n64.powermode=highperformance
 
+# FBNeo (libretro core) renders each frame in CPU software (sprite/tile
+# compositing into a framebuffer, only the final blit goes through
+# GLES) - so this is a CPU-bound system, unlike N64/GPU above. Live test
+# on gunbirdka (Psikyo CPS-era arcade board emulation): ~50fps under
+# "interactive" (freq measured mid-run at 1.8GHz, not pinned to the
+# 1.99GHz max) with dips into the 30s during busy scenes (bullet-heavy
+# patterns, more sprites to composite per frame). Same fix as N64:
+# pin CPU to "performance" during gameplay only.
+fbneo.powermode=highperformance
+
+# Default core for the fbneo system: dsno/Zansword's Korean-patched
+# fork (package/batocera/emulators/retroarch/libretro/
+# libretro-fbneo-korean/) instead of upstream libretro-fbneo. This
+# board carries a Korean-patched arcade ROM library (CRC-tolerant
+# driver patches for Korean-translated CPS1/CPS2/Psikyo/etc. games)
+# that the standard fbneo core rejects outright on CRC32 mismatch -
+# and the Korean fork is additive (new CRC allowances/driver entries,
+# not a removal of existing validation), so unpatched/original ROMs
+# keep working fine under it too.
+fbneo.emulator=libretro
+fbneo.core=fbneo_korean
+
 # VU8M is a portrait-mounted panel; rotate for landscape UI when it's used
 # as an output. Two different lookup keys are needed because the two
 # consumers derive the connector identifier differently:
