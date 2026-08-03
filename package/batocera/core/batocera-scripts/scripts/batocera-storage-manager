@@ -9,7 +9,23 @@ LOG_FILE="/var/log/batocera-storage.log"
 POOL_PATH="/userdata/roms"
 CONFIG_KEY="mergerfs.roms"
 BOOT_CONF_FILE="/boot/batocera-boot.conf"
-MERGERFS_OPTS="-o cache.files=partial,dropcacheonclose=true,category.create=eplfs,allow_other,inodecalc=path-hash,moveonenospc=true,minfreespace=4G"
+
+# category.search defaults to "ff" (first found branch in the pool's branch
+# list) when unset. $BASE_DIR (.roms_base, the SD card) is always listed
+# first in the pool, so any path that happens to exist on BOTH branches
+# resolves to the SD card's copy - masking the other branch entirely. This
+# bites us specifically because batocera-es-system ships small factory-demo
+# gamelist.xml/roms for several systems (gba/snes/nes/megadrive/pcengine/
+# c64/pygame etc, see S12populateshare), which get recreated onto
+# .roms_base's onto onto the same relative paths as the real, fully-scraped
+# gamelist.xml already present on the merged NVMe branch - every time
+# /userdata is wiped (SD card reflash), these masked the real gamelist
+# system-wide even though the actual ROM files/media were untouched.
+# category.search=newest picks whichever branch's copy has the newer mtime
+# for a given path instead - the real gamelist (scraped/edited well after
+# the image's fixed 2017 build-time stamp) always wins over the freshly
+# recreated factory-demo stub.
+MERGERFS_OPTS="-o cache.files=partial,dropcacheonclose=true,category.create=eplfs,category.search=newest,allow_other,inodecalc=path-hash,moveonenospc=true,minfreespace=4G"
 
 # --- HELPERS ---
 log_msg() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"; }
