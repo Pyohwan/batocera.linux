@@ -1,0 +1,75 @@
+#!/bin/bash
+
+# Union /userdata/bios (SD card) with /media/ROMs/bios (NVMe) via mergerfs, the
+# same way batocera-storage-manager unions /userdata/roms with the NVMe ROMs
+# library - but done as a separate, dedicated script instead of extending
+# batocera-storage-manager itself, since that script hardcodes a single pool
+# (POOL_PATH=/userdata/roms, CONFIG_KEY=mergerfs.roms) throughout and BIOS is
+# depended on by every emulator at launch, so a mistake here has a much
+# bigger blast radius than a bad ROM merge.
+#
+# Without this, every SD-card reflash wipes /userdata/bios entirely (it's a
+# plain directory on mmcblk1p2, never unioned with anything) - confirmed
+# 2026-08-04: a prior reflash's BIOS restore was incomplete (only 2 of 26
+# files copied back from the manual NVMe backup), silently breaking neogeo
+# (missing neogeo.zip -> "sp-s3.sp1 CRC ... not found") among others.
+
+POOL_PATH="/userdata/bios"
+BASE_DIR="/userdata/.bios_base"
+NVME_BIOS="/media/ROMs/bios"
+MERGERFS_OPTS="-o cache.files=partial,dropcacheonclose=true,category.create=eplfs,category.search=newest,allow_other,inodecalc=path-hash,moveonenospc=true,minfreespace=4G,nonempty"
+
+case "$1" in
+  start|restart|reload)
+    # Already unioned (e.g. re-run of this script, or reload) - nothing to do.
+    if mount | grep -q " $POOL_PATH "; then
+      exit 0
+    fi
+
+    # mergerfs is FUSE-based; nothing earlier in boot guarantees /dev/fuse is
+    # loaded (same issue batocera-storage-manager works around).
+    modprobe fuse 2>/dev/null
+
+    # NVMe is internal/always-present on this board (not hot-pluggable like
+    # the roms case), but its mount is still udev-driven and not guaranteed
+    # to have completed by this point in the init.d sequence - wait briefly.
+    WAIT=0
+    while [ ! -d "/media/ROMs" ] && [ $WAIT -lt 15 ]; do
+        sleep 1
+        WAIT=$((WAIT+1))
+    done
+    if [ ! -d "/media/ROMs" ]; then
+        # NVMe never showed up this boot - leave bios SD-only rather than block.
+        exit 0
+    fi
+
+    mkdir -p "$BASE_DIR"
+    mkdir -p "$NVME_BIOS"
+
+    # First-time migration: move whatever is currently sitting directly in
+    # /userdata/bios (real SD-card content, likely the entire BIOS set today)
+    # onto the NVMe branch, NOT the SD-card base branch - the whole point is
+    # for this content to survive the next SD-card reflash, so it needs to
+    # actually live on NVMe rather than just being renamed into .bios_base
+    # (which is still on the SD card and would be wiped exactly the same way).
+    if [ -d "$POOL_PATH" ] && [ -n "$(ls -A "$POOL_PATH" 2>/dev/null)" ]; then
+        mv "$POOL_PATH"/* "$NVME_BIOS"/ 2>/dev/null
+        mv "$POOL_PATH"/.[!.]* "$NVME_BIOS"/ 2>/dev/null
+    fi
+    mkdir -p "$POOL_PATH"
+
+    /usr/bin/mergerfs $MERGERFS_OPTS "$BASE_DIR:$NVME_BIOS" "$POOL_PATH"
+    ;;
+
+  stop)
+    # Do nothing to avoid delaying shutdown
+    :
+    ;;
+
+  *)
+    echo "Usage: $0 {start|stop|restart|reload}"
+    exit 1
+    ;;
+esac
+
+exit 0
