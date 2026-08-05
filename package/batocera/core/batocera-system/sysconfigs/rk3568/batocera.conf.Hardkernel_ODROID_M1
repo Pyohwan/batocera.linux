@@ -52,6 +52,13 @@ n64.powermode=highperformance
 # pin CPU to "performance" during gameplay only.
 fbneo.powermode=highperformance
 
+# PSX (pcsx_rearmed, libretro core) is CPU-bound like FBNeo (dynarec CPU
+# emulation + GTE, GPU plugin is comparatively light) - live tests showed
+# the same "interactive"-governor-can't-keep-up pattern as N64/FBNeo
+# (Beatmania ~44fps, Soul Blade mostly 59fps but occasional drops to
+# 44fps). Same fix: pin CPU to "performance" during gameplay only.
+psx.powermode=highperformance
+
 # Default core for the fbneo system: dsno/Zansword's Korean-patched
 # fork (package/batocera/emulators/retroarch/libretro/
 # libretro-fbneo-korean/) instead of upstream libretro-fbneo. This
