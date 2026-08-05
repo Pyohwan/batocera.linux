@@ -29,42 +29,16 @@ global.videooutput2=none
 # edge, same measured responsiveness.
 system.cpu.governor=interactive
 
-# The interactive-vs-performance measurement above was ES menu scrolling
-# (light 2D load) - actual GPU-bound emulation is a different story. Live
-# A/B on N64 (mupen64plus+glide64mk2, GPU-bound OpenGL translation of the
-# TEV-equivalent pipeline): CPU was already pinned at max freq under
-# "interactive" (not the bottleneck), but GPU devfreq's default
-# "simple_ondemand" governor lagged behind load spikes - mid-60s%-to-70s%
-# of native speed with dips. Locking both CPU+GPU to the "performance"
-# governor during gameplay only (via the existing gameStart/gameStop
-# powermode_launch_hooks.sh mechanism, see batocera-power-mode's new
-# set_gpu_governor()) fixed it to mostly 90%+. Menu/idle still gets
-# "interactive" above - this only kicks in while a game is actually running.
-n64.powermode=highperformance
-
-# FBNeo (libretro core) renders each frame in CPU software (sprite/tile
-# compositing into a framebuffer, only the final blit goes through
-# GLES) - so this is a CPU-bound system, unlike N64/GPU above. Live test
-# on gunbirdka (Psikyo CPS-era arcade board emulation): ~50fps under
-# "interactive" (freq measured mid-run at 1.8GHz, not pinned to the
-# 1.99GHz max) with dips into the 30s during busy scenes (bullet-heavy
-# patterns, more sprites to composite per frame). Same fix as N64:
-# pin CPU to "performance" during gameplay only.
-fbneo.powermode=highperformance
-
-# PSX (pcsx_rearmed, libretro core) is CPU-bound like FBNeo (dynarec CPU
-# emulation + GTE, GPU plugin is comparatively light) - live tests showed
-# the same "interactive"-governor-can't-keep-up pattern as N64/FBNeo
-# (Beatmania ~44fps, Soul Blade mostly 59fps but occasional drops to
-# 44fps). Same fix: pin CPU to "performance" during gameplay only.
-psx.powermode=highperformance
-
-# NDS (drastic, standalone core) - same CPU-bound pattern as N64/FBNeo/PSX
-# above. User-confirmed live: New Super Mario Bros. (Korea) stutter
-# improved noticeably after pinning CPU to highperformance (tested
-# per-game first via ES's ADVANCED GAME OPTIONS, then made system-wide
-# here since it's the same underlying cause for any NDS game).
-nds.powermode=highperformance
+# Per-system powermode overrides (n64/fbneo/psx/nds all measurably
+# benefited from "highperformance" during gameplay - GPU-bound for N64,
+# CPU-bound for the other three) were tried here and confirmed live, but
+# removed again in favor of the user controlling `global.powermode`
+# directly via ES's own Game Settings menu (Settings > Game Settings >
+# Power Mode) - a system-specific override here would always win over
+# that menu's global choice (game > system > global precedence in
+# powermode_launch_hooks.sh), defeating the point of a single global
+# knob. See Joplin "ODROID-M1 retro OS 빌드 계획" for the underlying
+# measurements if per-system defaults are ever wanted again.
 
 # Default core for the fbneo system: dsno/Zansword's Korean-patched
 # fork (package/batocera/emulators/retroarch/libretro/
