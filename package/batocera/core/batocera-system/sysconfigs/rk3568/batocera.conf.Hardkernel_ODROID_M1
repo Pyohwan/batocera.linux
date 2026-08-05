@@ -59,6 +59,13 @@ fbneo.powermode=highperformance
 # 44fps). Same fix: pin CPU to "performance" during gameplay only.
 psx.powermode=highperformance
 
+# NDS (drastic, standalone core) - same CPU-bound pattern as N64/FBNeo/PSX
+# above. User-confirmed live: New Super Mario Bros. (Korea) stutter
+# improved noticeably after pinning CPU to highperformance (tested
+# per-game first via ES's ADVANCED GAME OPTIONS, then made system-wide
+# here since it's the same underlying cause for any NDS game).
+nds.powermode=highperformance
+
 # Default core for the fbneo system: dsno/Zansword's Korean-patched
 # fork (package/batocera/emulators/retroarch/libretro/
 # libretro-fbneo-korean/) instead of upstream libretro-fbneo. This
