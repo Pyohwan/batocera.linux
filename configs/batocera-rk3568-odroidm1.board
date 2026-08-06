@@ -94,13 +94,18 @@ BR2_PACKAGE_LIBRETRO_DOLPHIN=y
 # libretro-fbneo-korean/.
 BR2_PACKAGE_LIBRETRO_FBNEO_KOREAN=y
 
-# Saturn: upstream only selects kronos for x86 (package/batocera/core/
-# batocera-system/Config.in), but the .mk already supports several other
-# ARM+GLES boards via FORCE_GLES=1 (odroid-xu4/n2, rockpro64, odroid-c4) -
-# added an RK3568 branch reusing the odroid-c4 GLES platform. Untested on
-# real hardware yet: yabasanshiro (already built) stays the default/
-# fallback core regardless, this just makes kronos available to try too.
-BR2_PACKAGE_LIBRETRO_KRONOS=y
+# Saturn: tried enabling kronos here (upstream only selects it for x86,
+# but its .mk already supports several ARM+GLES boards via FORCE_GLES=1 -
+# added an RK3568 branch reusing the odroid-c4 GLES platform, see
+# libretro-kronos.mk). Blocked for now: LIBRETRO_KRONOS_DEPENDENCIES pulls
+# in full BR2_PACKAGE_MESA3D unconditionally, which buildroot refuses to
+# combine with BR2_PACKAGE_MESA3D_HEADERS (mesa3d-headers.mk hard-stops:
+# "mesa3d-headers enabled, but mesa3d enabled too") - that's the headers-
+# only package our vendor blob setup (mali-g52-odroidm1.mk) depends on
+# instead of full Mesa. Needs kronos.mk patched to not require full mesa3d
+# on this board (unclear yet whether it actually needs anything beyond
+# headers for the FORCE_GLES path) before this can be turned back on.
+# BR2_PACKAGE_LIBRETRO_KRONOS=y
 
 # NDS: upstream only selects libretro-melonds-ds when BR2_PACKAGE_
 # BATOCERA_XWAYLAND is set, which is off on this board (see the Wayland-
