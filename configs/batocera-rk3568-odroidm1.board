@@ -94,6 +94,23 @@ BR2_PACKAGE_LIBRETRO_DOLPHIN=y
 # libretro-fbneo-korean/.
 BR2_PACKAGE_LIBRETRO_FBNEO_KOREAN=y
 
+# Saturn: upstream only selects kronos for x86 (package/batocera/core/
+# batocera-system/Config.in), but the .mk already supports several other
+# ARM+GLES boards via FORCE_GLES=1 (odroid-xu4/n2, rockpro64, odroid-c4) -
+# added an RK3568 branch reusing the odroid-c4 GLES platform. Untested on
+# real hardware yet: yabasanshiro (already built) stays the default/
+# fallback core regardless, this just makes kronos available to try too.
+BR2_PACKAGE_LIBRETRO_KRONOS=y
+
+# NDS: upstream only selects libretro-melonds-ds when BR2_PACKAGE_
+# BATOCERA_XWAYLAND is set, which is off on this board (see the Wayland-
+# client EGL note above) - that gate has nothing to do with melonds-ds's
+# actual dependencies (cmake, libpcap, libstdc++ only), so force it on.
+# The older libretro-melonds (already built by default) is confirmed dead
+# on this blob (requires desktop GL, board only has GLES) - melonds-ds has
+# a Software render mode that doesn't need GL at all, worth trying.
+BR2_PACKAGE_LIBRETRO_MELONDS_DS=y
+
 # Firmware
 BR2_PACKAGE_FIRMWARE_ARMBIAN=y
 
