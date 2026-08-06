@@ -239,6 +239,12 @@ class MelonDSGenerator(Generator):
             array=commandArray,
             env={
                 "XDG_CONFIG_HOME": CONFIGS,
-                "XDG_DATA_HOME": SAVES
+                "XDG_DATA_HOME": SAVES,
+                # Default Qt platform ("xcb") aborts immediately - this board
+                # has neither X11 nor a working Wayland-client EGL path (see
+                # melonds.mk). "eglfs" (direct KMS/GBM) is the one that
+                # actually works here, same EGL platform every other
+                # consumer on this board already uses.
+                "QT_QPA_PLATFORM": "eglfs"
             }
         )
