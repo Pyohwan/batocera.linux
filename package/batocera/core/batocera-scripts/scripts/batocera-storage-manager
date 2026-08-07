@@ -199,6 +199,46 @@ get_unique_id() {
     fi
 }
 
+# Partition-scoped counterpart to get_unique_id (which is disk-scoped by
+# design - it works off the parent disk's serial/WWN, since that's what's
+# needed to recognize "this is the same physical drive" across boots
+# regardless of which port it's plugged into). REQUEST_MERGE/"ignore
+# forever" need a per-*partition* id instead: a drive with several
+# partitions (e.g. leftover OS installs alongside the real ROMs partition)
+# must let the user permanently ignore the junk ones without that also
+# blocking the real ROMs partition on the same disk - confirmed live on
+# hardware, see the comment on CURRENT_CONFIG matching in mount_partition.
+get_partition_unique_id() {
+    local dev_path="/dev/$1"
+    local id=$(blkid -s UUID -o value "$dev_path")
+    [ -n "$id" ] && { echo "$id"; return; }
+    id=$(blkid -s PARTUUID -o value "$dev_path")
+    [ -n "$id" ] && { echo "$id"; return; }
+    # No filesystem/partition UUID at all (e.g. unformatted) - fall back to
+    # the devname, same last resort as get_unique_id.
+    echo "$1"
+}
+
+# A roms/ directory existing is not enough - any partition with an
+# incidentally-named "roms" folder (leftover installs, unrelated software)
+# was triggering a merge prompt. Require at least one subdirectory whose
+# name matches a real batocera system folder, using the on-device skeleton
+# (/usr/share/batocera/datainit/roms/<system>) as the reference list rather
+# than a hardcoded one, so it stays correct across builds/configs.
+is_valid_roms_dir() {
+    local candidate="$1"
+    local reference="/usr/share/batocera/datainit/roms"
+    [ -d "$candidate" ] || return 1
+    [ -d "$reference" ] || return 0  # reference missing - fall back to old behavior
+    local sysdir sysname
+    for sysdir in "$candidate"/*/; do
+        [ -d "$sysdir" ] || continue
+        sysname=$(basename "$sysdir")
+        [ -d "$reference/$sysname" ] && return 0
+    done
+    return 1
+}
+
 mount_partition() {
     local PART_DEV=$1
     local IGNORE_AUTOMATION=$2
@@ -263,7 +303,7 @@ mount_partition() {
     fi
 
     # Check Content & Merge
-    if [ -d "$MOUNT_POINT/roms" ]; then
+    if is_valid_roms_dir "$MOUNT_POINT/roms"; then
         log_msg "VALID: [$PART_DEV] /roms found at $MOUNT_POINT"
 
         local BRANCH_PATH="$MOUNT_POINT/roms"
@@ -316,7 +356,11 @@ mount_partition() {
         local SIZE_CLEAN=$(echo "$SIZE" | tr ':' '_')
         [ -z "$MODEL_CLEAN" ] && MODEL_CLEAN="Generic Drive"
 
-        local UNIQUE_ID=$(get_unique_id "$PARENT")
+        # Partition-scoped, not disk-scoped (get_unique_id) - "ignore
+        # forever" on this notification's id must only ever ignore this one
+        # partition, not every other partition sharing the same physical
+        # disk (see get_partition_unique_id).
+        local UNIQUE_ID=$(get_partition_unique_id "$PART_NAME")
         send_notification "REQUEST_MERGE:$PART_NAME:$MODEL_CLEAN:$SIZE_CLEAN:$MOUNT_POINT:$UNIQUE_ID"
         return 2
     fi
@@ -604,11 +648,22 @@ case "$COMMAND" in
     # Check Ignore List (Disables Automation only)
     IGNORE_AUTOMATION=false
     UNIQUE_ID=$(get_unique_id "$PARENT_DISK")
-    CLEAN_ID=${UNIQUE_ID%:*} 
-    
-    if [ -n "$UNIQUE_ID" ] && [ -f "$BOOT_CONF_FILE" ]; then
+    CLEAN_ID=${UNIQUE_ID%:*}
+
+    # Partition-level id for this specific partition (empty for whole-disk
+    # events, i.e. DEVNAME == PARENT_DISK) - "ignore forever" is recorded
+    # per-partition now (see get_partition_unique_id), so this must be
+    # checked independently of the disk-level id: a sibling partition being
+    # ignored must not disable automation here.
+    PART_UNIQUE_ID=""
+    [ "$DEVNAME" != "$PARENT_DISK" ] && PART_UNIQUE_ID=$(get_partition_unique_id "$DEVNAME")
+
+    if [ -f "$BOOT_CONF_FILE" ]; then
         IGNORED_LIST=$(batocera-settings-get -f "$BOOT_CONF_FILE" "ignore.drives")
-        if [[ " $IGNORED_LIST " == *" $UNIQUE_ID "* ]] || [[ " $IGNORED_LIST " == *" $CLEAN_ID "* ]]; then
+        if [ -n "$PART_UNIQUE_ID" ] && [[ " $IGNORED_LIST " == *" $PART_UNIQUE_ID "* ]]; then
+            log_msg "INFO: [$DEVNAME] Partition (ID: $PART_UNIQUE_ID) is in boot config ignore list. Automation disabled."
+            IGNORE_AUTOMATION=true
+        elif [ -n "$UNIQUE_ID" ] && { [[ " $IGNORED_LIST " == *" $UNIQUE_ID "* ]] || [[ " $IGNORED_LIST " == *" $CLEAN_ID "* ]]; }; then
             log_msg "INFO: [$DEVNAME] Disk '$PARENT_DISK' (ID: $UNIQUE_ID) is in boot config ignore list. Automation disabled."
             IGNORE_AUTOMATION=true
         fi
