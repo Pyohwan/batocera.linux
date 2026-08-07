@@ -62,6 +62,13 @@ BR2_TARGET_ROOTFS_SQUASHFS4_ZSTD=y
 # BIFROST unset, CONFIG_DRM_PANFROST=y (see linux-defconfig.config).
 # BR2_PACKAGE_MALI_G52_ODROIDM1=y
 
+# (TRX/Tomb-Raider auto-select used to be gated on !BR2_PACKAGE_MALI_
+# G52_ODROIDM1 specifically as a stand-in for "this board has no desktop
+# GL" - flipped back on and hard-stopped the build once that package was
+# disabled here. Fixed at the real root cause instead: batocera-system/
+# Config.in's TRX select now checks BR2_PACKAGE_HAS_LIBGL directly, which
+# is false for both the blob and Panfrost/GLES-only Mesa on this board.)
+
 # Mesa3D with the panfrost gallium driver takes over as the HAS_LIBEGL/
 # HAS_LIBGLES/HAS_LIBGBM provider (mali-g52-odroidm1's Config.in used to
 # do this via BR2_PACKAGE_PROVIDES_LIBEGL=mali-g52-odroidm1 etc.). No
@@ -69,6 +76,7 @@ BR2_TARGET_ROOTFS_SQUASHFS4_ZSTD=y
 # excludes Vulkan from this comparison (blob has none, Mesa's PanVK is
 # non-conformant on G52) to keep both sides GLES-only and comparable.
 BR2_PACKAGE_MESA3D=y
+BR2_PACKAGE_MESA3D_LLVM=y
 BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_PANFROST=y
 BR2_PACKAGE_MESA3D_OPENGL_EGL=y
 BR2_PACKAGE_MESA3D_OPENGL_ES=y
