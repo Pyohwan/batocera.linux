@@ -47,10 +47,31 @@ BR2_PACKAGE_HOST_DTC=y
 BR2_PACKAGE_BATOCERA_KODI21=y
 BR2_TARGET_ROOTFS_SQUASHFS4_ZSTD=y
 
-# GPU - Mali-G52 blob (hardkernel). The kernel also builds Panfrost as an
-# unused module (matches the real device: loaded, refcount 0) but we use
-# the proprietary blob, matching what's verified working on hardware.
-BR2_PACKAGE_MALI_G52_ODROIDM1=y
+# GPU - Panfrost (Mesa gallium), replacing the Mali-G52 blob for the
+# Panfrost A/B experiment (branch odroid-m1-panfrost / kernel branch
+# panfrost-enable). Static DTS check confirmed a clean match against
+# panfrost's of_match_table before this switch: compatible = "arm,mali-
+# bifrost" (drivers/gpu/drm/panfrost/panfrost_drv.c dt_match), clock
+# lookup is unnamed/positional (devm_clk_get(dev, NULL) grabs the first
+# listed clock, which is the SCMI-backed "clk_mali" - no clk-scmi -517
+# risk since CONFIG_COMMON_CLK_SCMI is already =y), and the "mali-supply"
+# regulator property matches panfrost's default_supplies[] = {"mali",
+# NULL} exactly. Board dtsi override (rk3568-evb.dtsi &gpu) only adds
+# mali-supply + status=okay, no custom kbase-only properties - this DTS
+# was effectively already mainline-shaped. Kernel side: CONFIG_MALI_
+# BIFROST unset, CONFIG_DRM_PANFROST=y (see linux-defconfig.config).
+# BR2_PACKAGE_MALI_G52_ODROIDM1=y
+
+# Mesa3D with the panfrost gallium driver takes over as the HAS_LIBEGL/
+# HAS_LIBGLES/HAS_LIBGBM provider (mali-g52-odroidm1's Config.in used to
+# do this via BR2_PACKAGE_PROVIDES_LIBEGL=mali-g52-odroidm1 etc.). No
+# Vulkan driver enabled here on purpose - Joplin A/B plan explicitly
+# excludes Vulkan from this comparison (blob has none, Mesa's PanVK is
+# non-conformant on G52) to keep both sides GLES-only and comparable.
+BR2_PACKAGE_MESA3D=y
+BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_PANFROST=y
+BR2_PACKAGE_MESA3D_OPENGL_EGL=y
+BR2_PACKAGE_MESA3D_OPENGL_ES=y
 
 # No compositor (labwc/Wayland): the vendor Mali blob's Wayland-client EGL
 # platform is broken (confirmed live on hardware - eglGetPlatformDisplayEXT
@@ -105,6 +126,12 @@ BR2_PACKAGE_LIBRETRO_FBNEO_KOREAN=y
 # instead of full Mesa. Needs kronos.mk patched to not require full mesa3d
 # on this board (unclear yet whether it actually needs anything beyond
 # headers for the FORCE_GLES path) before this can be turned back on.
+# NOTE (odroid-m1-panfrost branch only): this specific blocker (mesa3d-
+# headers vs full mesa3d hard-stop) no longer applies here now that the
+# board runs full BR2_PACKAGE_MESA3D for panfrost - kronos could likely
+# just be turned on as-is on this branch. Left off anyway to keep the
+# Panfrost A/B diff scoped to GPU driver only; worth revisiting once
+# panfrost itself is confirmed working on hardware.
 # BR2_PACKAGE_LIBRETRO_KRONOS=y
 
 # NDS: upstream only selects libretro-melonds-ds when BR2_PACKAGE_
