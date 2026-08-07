@@ -1,5 +1,14 @@
 include batocera-board.common
 
+# Build machine job cap - not a board property, but MAKE_JLEVEL passed on
+# the make command line doesn't reach this .config (add-defconfig
+# plumbing doesn't apply to plain <board>-build), and hand-editing the
+# generated _defconfig doesn't stick (gets regenerated from this file).
+# BR2_JLEVEL=0 (auto = nproc+1) pushed a 16-core/15GB host into ~8GB of
+# swap compiling LLVM+Mesa3D for the Panfrost experiment. Lower this (or
+# remove it) on a beefier build machine.
+BR2_JLEVEL=4
+
 # Target definition
 BR2_aarch64=y
 BR2_cortex_a55=y
