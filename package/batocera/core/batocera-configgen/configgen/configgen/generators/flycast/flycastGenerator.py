@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from os import environ
 from shutil import copyfile
 from typing import TYPE_CHECKING
 
@@ -185,6 +186,26 @@ class FlycastGenerator(Generator):
 
         # the command to run
         commandArray = ['/usr/bin/flycast', rom]
+
+        # SDL2 defaults to auto-detecting the video driver (wayland -> x11 -> ...);
+        # on boards with no compositor and no X11 (direct KMS/DRM only), that probe
+        # fails outright (XDG_RUNTIME_DIR missing, then "Can't load EGL/GL library
+        # on window creation") instead of falling back to kmsdrm, so force it.
+        if environ.get("WAYLAND_DISPLAY"):
+            sdl_videodriver = "wayland"
+        elif environ.get("DISPLAY"):
+            sdl_videodriver = "x11"
+        else:
+            sdl_videodriver = "kmsdrm"
+
+        # Same reasoning for audio: this SDL2 is built with pulseaudio disabled
+        # in favor of pipewire (see sdl2.mk), and pipewire's client socket lives
+        # under XDG_RUNTIME_DIR, which emulatorlauncher doesn't set - without it
+        # SDL falls back to raw ALSA (fails: device already owned by pipewire)
+        # and even the pipewire driver itself can't find the socket.
+        sdl_audiodriver = "pipewire"
+        xdg_runtime_dir = environ.get("XDG_RUNTIME_DIR", "/run")
+
         # Here is the trick to make flycast find files :
         # emu.cfg is in $XDG_CONFIG_DIRS or $XDG_CONFIG_HOME.
         # VMU will be in $XDG_DATA_HOME / $FLYCAST_DATADIR because it needs rw access -> /userdata/saves/dreamcast
@@ -199,6 +220,9 @@ class FlycastGenerator(Generator):
                 "FLYCAST_DATADIR": FLYCAST_SAVES.parent,
                 "FLYCAST_BIOS_PATH": FLYCAST_BIOS,
                 "SDL_GAMECONTROLLERCONFIG": generate_sdl_game_controller_config(playersControllers),
-                "SDL_JOYSTICK_HIDAPI": "0"
+                "SDL_JOYSTICK_HIDAPI": "0",
+                "SDL_VIDEODRIVER": sdl_videodriver,
+                "SDL_AUDIODRIVER": sdl_audiodriver,
+                "XDG_RUNTIME_DIR": xdg_runtime_dir
             }
         )
