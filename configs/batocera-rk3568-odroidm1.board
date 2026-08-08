@@ -27,11 +27,19 @@ BR2_TARGET_GENERIC_GETTY_BAUDRATE_115200=y
 BR2_GLOBAL_PATCH_DIR="$(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/patches $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/patches $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/bsp-odroidm1/patches"
 BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/fsoverlay $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/fsoverlay $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/rk3568/fsoverlay $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/bsp-odroidm1/fsoverlay"
 
-# Kernel - our hardkernel BSP fork (HDMI+DSI dual livelock fix), not mainline
+# Kernel - our hardkernel BSP fork (HDMI+DSI dual livelock fix), not mainline.
+# odroid-m1-panfrost branch (this file) tracks the panfrost-enable kernel
+# branch specifically - NOT fix-hdmi-dsi-dual-livelock, which track A (blob)
+# still uses directly. panfrost-enable carries a DTS fix (interrupt-names
+# case + a separate, ungated GPU OPP table) that panfrost's probe needs but
+# the vendor-kbase-oriented base tree doesn't provide - see rk356x.dtsi gpu
+# node history. This pointer was accidentally left on the shared base
+# branch for the first panfrost build attempt (the DTS gap was masked by a
+# different bug at the time); real-hardware dmesg is what surfaced it.
 BR2_LINUX_KERNEL=y
 BR2_LINUX_KERNEL_CUSTOM_GIT=y
 BR2_LINUX_KERNEL_CUSTOM_REPO_URL="https://github.com/Pyohwan/linux.git"
-BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION="fix-hdmi-dsi-dual-livelock"
+BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION="panfrost-enable"
 BR2_KERNEL_HEADERS_6_1=y
 BR2_LINUX_KERNEL_USE_CUSTOM_CONFIG=y
 BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="$(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/bsp-odroidm1/linux-defconfig.config"
