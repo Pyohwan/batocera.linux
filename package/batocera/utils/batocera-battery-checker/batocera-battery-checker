@@ -17,7 +17,20 @@ getBattery() {
 
 # Function to check if the ayn power supply is connected
 is_power_connected() {
-    PLUGGED=$(cat /sys/class/power_supply/*/online 2>/dev/null | grep -E "^1")
+    if compgen -G "/sys/class/power_supply/*/online" > /dev/null; then
+        PLUGGED=$(cat /sys/class/power_supply/*/online 2>/dev/null | grep -E "^1")
+    else
+        # No power_supply class devices at all (no battery, no AC "online"
+        # node - e.g. desktop-style SBCs like the ODROID-M1) - nothing for
+        # the glob above to match, which used to fall through to "not
+        # connected" and made this checker call `batocera-power-mode
+        # battery` right at boot on every such board, silently overriding
+        # whatever CPU governor S18governor had just applied (confirmed
+        # live: interactive correctly set by S18governor, then reset to
+        # schedutil by this call ~10s later). Treat "no power_supply info
+        # at all" as always AC-connected instead.
+        PLUGGED="1"
+    fi
     if [ -n "${PLUGGED}" ]; then
         echo 1  # Power supply is connected
     else

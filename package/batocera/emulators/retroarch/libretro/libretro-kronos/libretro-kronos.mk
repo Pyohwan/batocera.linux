@@ -29,6 +29,15 @@ LIBRETRO_KRONOS_EXTRA_ARGS += FORCE_GLES=1
 else ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_S905GEN3),y)
 LIBRETRO_KRONOS_PLATFORM = odroid-c4
 LIBRETRO_KRONOS_EXTRA_ARGS += FORCE_GLES=1
+
+else ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_RK3568),y)
+# upstream only selects this package for x86 (see Config.in) - never tested
+# on RK3568, but the .mk itself already supports several other ARM+GLES
+# boards (odroid-xu4/n2, rockpro64, odroid-c4) the same way, so reusing the
+# odroid-c4 GLES platform here is a reasonable first attempt, not a known-
+# good config.
+LIBRETRO_KRONOS_PLATFORM = odroid-c4
+LIBRETRO_KRONOS_EXTRA_ARGS += FORCE_GLES=1
 endif
 
 define LIBRETRO_KRONOS_BUILD_CMDS

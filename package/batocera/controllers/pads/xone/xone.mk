@@ -5,7 +5,11 @@
 ################################################################################
 
 # Workaround the need for Kernel 5.11 or greater with some boards
-ifeq ($(BR2_PACKAGE_HOST_LINUX_HEADERS_CUSTOM_5_4)$(BR2_PACKAGE_HOST_LINUX_HEADERS_CUSTOM_5_10)$(BR2_KERNEL_HEADERS_5_15),y)
+# v0.5.5 calls crypto_akcipher_sync_encrypt(), which doesn't exist on
+# BR2_KERNEL_HEADERS_6_1 (odroid-m1-bsp-kernel's hardkernel BSP fork included -
+# only crypto_akcipher_encrypt() is present there), so route it to the older
+# commit the same as the other pre-5.15 cases below.
+ifeq ($(BR2_PACKAGE_HOST_LINUX_HEADERS_CUSTOM_5_4)$(BR2_PACKAGE_HOST_LINUX_HEADERS_CUSTOM_5_10)$(BR2_KERNEL_HEADERS_5_15)$(BR2_KERNEL_HEADERS_6_1),y)
     XONE_VERSION = bbf0dcc484c3f5611f4e375da43e0e0ef08f3d18
 else
     XONE_VERSION = v0.5.8

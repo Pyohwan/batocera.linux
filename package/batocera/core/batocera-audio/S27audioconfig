@@ -38,7 +38,16 @@ apply_audioconfig() {
     fi
 
     # Set Default Sink
-    if test -n "${DEVICE}" && [ "${DEVICE}" != "auto" ]; then
+    # "auto" is applied too (not just explicit device names): on boards
+    # where batocera-audio's "set auto" resolves to a board-specific
+    # default (e.g. rk3568/odroidm1 following the active display), skipping
+    # it here left the sink wherever PipeWire's own policy happened to put
+    # it, never actually applying that default at boot.
+    if [ "${DEVICE}" = "auto" ]; then
+        log "info" "Applying device: auto"
+        ERR=$(batocera-audio set auto 2>&1)
+        [ $? -ne 0 ] && log "err" "Set-device (auto) failed: $ERR" && EXITCODE=1
+    elif test -n "${DEVICE}"; then
         log "info" "Applying device: ${DEVICE}"
         # Check if the device is actually in the list we just found
         if [[ ! "$CURRENT_SINKS" =~ "$DEVICE" ]]; then

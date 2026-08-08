@@ -18,6 +18,26 @@ log() {
 
 start_pipewire() {
     log "info" "Starting audio service sequence..."
+
+    # Wait for the system D-Bus socket to exist before starting PipeWire.
+    # WirePlumber (spawned by PipeWire as its session manager) connects to
+    # this same socket as its "session" bus (see /etc/profile.d/dbus.sh).
+    # If PipeWire starts before dbus-daemon has created the socket,
+    # WirePlumber's D-Bus module fails once ("Cannot autolaunch D-Bus
+    # without X11 $DISPLAY") and never retries, permanently disabling its
+    # bluez5 monitor - confirmed live (no Bluetooth audio sink ever
+    # appears, even though pairing/connection succeed at the bluetoothd
+    # level) until WirePlumber is manually restarted after the socket
+    # exists.
+    N=0
+    while [ ! -S "/run/dbus/system_bus_socket" ] && [ $N -lt 50 ]; do
+        sleep 0.1
+        N=$((N+1))
+    done
+    if [ ! -S "/run/dbus/system_bus_socket" ]; then
+        log "err" "D-Bus system socket still missing after 5s wait - WirePlumber's D-Bus module will likely fail to start"
+    fi
+
     # Cleanup stale locks
     rm -f /var/run/pipewire-0 /var/run/pipewire-0.lock
     # Start the PipeWire daemon

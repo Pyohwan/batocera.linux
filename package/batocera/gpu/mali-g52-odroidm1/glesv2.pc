@@ -1,0 +1,11 @@
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: glesv2
+Description: Mali G52 (odroid-m1) implementation of OpenGL ESv2
+Version: 2.0
+Requires:
+Libs: -L${libdir} -lGLESv2
+Cflags: -I${includedir} -DEGL_NO_X11 -DMESA_EGL_NO_X11_HEADERS

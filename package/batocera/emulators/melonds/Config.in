@@ -7,6 +7,9 @@ config BR2_PACKAGE_MELONDS
     select BR2_PACKAGE_LIBEPOXY
     select BR2_PACKAGE_SDL2
     select BR2_PACKAGE_SLIRP
+    select BR2_PACKAGE_XORG7
+    select BR2_PACKAGE_XLIB_LIBX11
+    select BR2_PACKAGE_LIBINPUT if BR2_PACKAGE_MALI_G52_ODROIDM1
     help
       A Ninteno DS emulator
 

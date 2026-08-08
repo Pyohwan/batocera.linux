@@ -32,6 +32,39 @@ _wait_for_compositor() {
     return 1
 }
 
+# Resolves an output identifier to listOutputs' own canonical "N - NAME"
+# form, whatever format it was given in. global.videooutput-style values
+# ("HDMI-A-1", "DSI-1", matching /sys/class/drm/cardX-<name>) don't match
+# listOutputs' "0 - HDMIA" lines (NAME there comes from batocera-drminfo,
+# which drops the dashes/suffix) - every validation check below used to
+# compare those two formats directly and always fail, so a configured
+# global.videooutput was silently treated as invalid every time (falls
+# through the whole fallback chain, confirmed live via display.log:
+# "Invalid output - HDMI-A-1" even though HDMI-A-1 was in fact connected
+# and selectable). Canonicalizing once up front means every subsequent
+# exact-string comparison in this script (which already assumes
+# listOutputs' own format) just works.
+# Caveat: normalization is alnum-lowercase + prefix match, so it can
+# mismatch on boards with a connector name that's a strict prefix of
+# another (e.g. "DP" vs "DPI" - "dpi1" would match "dp"* first). Not an
+# issue on this board (hdmia/dsi share no such prefix relationship).
+_canon_output() {
+    local target="$1"
+    [ -z "${target}" ] && return 1
+    local norm_target
+    norm_target=$(echo "${target}" | tr -cd '[:alnum:]' | tr '[:upper:]' '[:lower:]')
+    local line name norm_name
+    while IFS= read -r line; do
+        [ "${target}" = "${line}" ] && { echo "${line}"; return 0; }
+        name="${line#* - }"
+        norm_name=$(echo "${name}" | tr -cd '[:alnum:]' | tr '[:upper:]' '[:lower:]')
+        case "${norm_target}" in
+            "${norm_name}"*) echo "${line}"; return 0 ;;
+        esac
+    done < <(batocera-resolution listOutputs)
+    return 1
+}
+
 GAMELAUNCH=1
 while [ -e "${REBOOT_FLAG}" ]; do
     echo "Standalone: --- Top of display configuration loop ---" >> "$log"
@@ -111,31 +144,36 @@ while [ -e "${REBOOT_FLAG}" ]; do
 
     # Validate output 1
     if [ -n "${settings_output}" ]; then
-        if ! batocera-resolution listOutputs | grep -qE '^'"${settings_output}"'$'; then
+        canon=$(_canon_output "${settings_output}")
+        if [ -z "${canon}" ]; then
             echo "Standalone: Invalid output - ${settings_output}" >> $log
             settings_output=
+        else
+            settings_output="${canon}"
         fi
     fi
     # Validate output 2
     if [ -n "${settings_output2}" ]; then
-        if [ -z "${settings_output}" -o "${settings_output}" = "${settings_output2}" ]; then
+        canon=$(_canon_output "${settings_output2}")
+        if [ -z "${settings_output}" -o "${settings_output}" = "${canon}" ]; then
+            settings_output2=
+        elif [ -z "${canon}" ]; then
+            echo "Standalone: Invalid output - ${settings_output2}" >> $log
             settings_output2=
         else
-            if ! batocera-resolution listOutputs | grep -qE '^'"${settings_output2}"'$'; then
-                echo "Standalone: Invalid output - ${settings_output2}" >> $log
-                settings_output2=
-            fi
+            settings_output2="${canon}"
         fi
     fi
     # Validate output 3
     if [ -n "${settings_output3}" ]; then
-        if [ -z "${settings_output}" -o -z "${settings_output2}" -o "${settings_output}" = "${settings_output3}" -o "${settings_output2}" = "${settings_output3}" ]; then
+        canon=$(_canon_output "${settings_output3}")
+        if [ -z "${settings_output}" -o -z "${settings_output2}" -o "${settings_output}" = "${canon}" -o "${settings_output2}" = "${canon}" ]; then
+            settings_output3=
+        elif [ -z "${canon}" ]; then
+            echo "Standalone: Invalid output - ${settings_output3}" >> $log
             settings_output3=
         else
-            if ! batocera-resolution listOutputs | grep -qE '^'"${settings_output3}"'$'; then
-                echo "Standalone: Invalid output - ${settings_output3}" >> $log
-                settings_output3=
-            fi
+            settings_output3="${canon}"
         fi
     fi
 
@@ -145,8 +183,9 @@ while [ -e "${REBOOT_FLAG}" ]; do
     fi
 
     if [ -z "${settings_output}" ] && [ -n "${LAST_PRIMARY_SCREEN}" ]; then
-        if batocera-resolution listOutputs | grep -qE "^${LAST_PRIMARY_SCREEN}$"; then
-            settings_output="${LAST_PRIMARY_SCREEN}"
+        canon=$(_canon_output "${LAST_PRIMARY_SCREEN}")
+        if [ -n "${canon}" ]; then
+            settings_output="${canon}"
             echo "Standalone: Restored last primary video output - ${settings_output}" >> $log
         fi
     fi
@@ -155,14 +194,26 @@ while [ -e "${REBOOT_FLAG}" ]; do
         settings_output=$(batocera-resolution currentOutput)
         echo "Standalone: First video output defaulted to - ${settings_output}" >> $log
         # currentOutput may be unplugged after an event of type unplugging it (/var/run/switch_screen_request)
-        if ! batocera-resolution listOutputs | grep -qE "^${settings_output}$"; then
+        canon=$(_canon_output "${settings_output}")
+        if [ -z "${canon}" ]; then
             echo "Standalone: Default output '${settings_output}' not connected. Finding first available." >> "$log"
             settings_output=$(batocera-resolution listOutputs | head -1)
+        else
+            settings_output="${canon}"
         fi
     fi
     # If screen2 is empty, take the first one found which is not screen1
     if [ -z "${settings_output2}" ]; then
-        user_output2="$(batocera-settings-get global.videooutput2)"
+        # -master (not plain batocera-settings-get): this needs to see
+        # sysconfig-level defaults too, e.g. ODROID-M1's
+        # global.videooutput2=none (mutually-exclusive HDMI/VU8M, not
+        # dual-output). Using the non-master lookup here meant that
+        # default was invisible - it only checks /userdata/system/
+        # batocera.conf directly, so an unset user override read back as
+        # empty ("!= none") and this auto-picked a second output anyway.
+        # Confirmed live: DSI-1 got auto-selected and DPMS'd back On every
+        # boot despite the sysconfig default being in place.
+        user_output2="$(batocera-settings-get-master global.videooutput2)"
         if [ "${user_output2}" != "none" ]; then
             settings_output2=$(batocera-resolution listOutputs | grep -vE "^${settings_output}$" | head -1)
             if [ -n "${settings_output2}" ]; then
@@ -184,6 +235,20 @@ while [ -e "${REBOOT_FLAG}" ]; do
     fi
     echo "Updated video outputs: ${settings_output}, ${settings_output2}, ${settings_output3}" >> $log
     ###################
+
+    # A previous approach here (DPMS-blanking any connected-but-unused
+    # output via modetest, to hide it rather than leave it frozen on the
+    # boot splash) was tried and abandoned: it fought with
+    # batocera-switch-screen-checker's hotplug detection (every write read
+    # as a real hotplug, triggering an ES quit/relaunch loop) and, once
+    # that was fixed, got silently undone again by ES's own screensaver
+    # every ~5 minutes. Root-caused instead of worked around: the unused
+    # output only needs hiding at all because our board unconditionally
+    # probes the VU8M DSI panel regardless of whether it's wanted. Fixed
+    # at the source in U-Boot (see boot/extlinux.conf's FDTOVERLAYS line,
+    # present only in the "batocera-vu8m" LABEL) - when VU8M isn't
+    # opted into, the kernel never probes it, so there's no second
+    # connector left to hide.
 
     # And now we can apply the setting per output...
     

@@ -1,0 +1,123 @@
+include batocera-board.common
+
+# Target definition
+BR2_aarch64=y
+BR2_cortex_a55=y
+BR2_ARM_FPU_NEON_FP_ARMV8=y
+BR2_PACKAGE_BATOCERA_TARGET_RK3568=y
+BR2_TARGET_OPTIMIZATION="-pipe -fsigned-char"
+BR2_TARGET_GENERIC_GETTY_BAUDRATE_115200=y
+# NOT rk3568/patches: its ffmpeg/mpv patches add v4l2-request HEVC support
+# that needs newer V4L2 UAPI structs only present in the shared target's
+# mainline 7.0.11 kernel headers, not our BSP fork. (An earlier version of
+# this comment claimed the shared target's uboot patches were relevant to
+# us too and copied them into bsp-odroidm1/patches/uboot/ - they weren't:
+# BR2_GLOBAL_PATCH_DIR only applies a <dir>/<pkg>/ patch to a package whose
+# name matches <pkg> exactly, and those were Anbernic RGxx3 fixes that
+# never once matched our uboot-odroid-m1 package. Removed.)
+BR2_GLOBAL_PATCH_DIR="$(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/patches $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/patches $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/bsp-odroidm1/patches"
+BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/fsoverlay $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/fsoverlay $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/rk3568/fsoverlay $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/bsp-odroidm1/fsoverlay"
+
+# Kernel - our hardkernel BSP fork (HDMI+DSI dual livelock fix), not mainline
+BR2_LINUX_KERNEL=y
+BR2_LINUX_KERNEL_CUSTOM_GIT=y
+BR2_LINUX_KERNEL_CUSTOM_REPO_URL="https://github.com/Pyohwan/linux.git"
+BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION="fix-hdmi-dsi-dual-livelock"
+BR2_KERNEL_HEADERS_6_1=y
+BR2_LINUX_KERNEL_USE_CUSTOM_CONFIG=y
+BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="$(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/bsp-odroidm1/linux-defconfig.config"
+BR2_LINUX_KERNEL_NEEDS_HOST_OPENSSL=y
+
+# Build the DTB from the kernel sources - in-tree DTS, odroid-m1 only
+BR2_LINUX_KERNEL_DTS_SUPPORT=y
+BR2_LINUX_KERNEL_INTREE_DTS_NAME="rockchip/rk3568-odroid-m1"
+
+# Override the RK3568-family default board list (11 boards) - we only build odroid-m1
+BR2_TARGET_BATOCERA_IMAGES_DEFINITIONS=y
+BR2_TARGET_BATOCERA_IMAGES="rockchip/bsp-odroidm1"
+
+# Bootloader
+BR2_PACKAGE_HOST_DOSFSTOOLS=y
+BR2_PACKAGE_UBOOT_ODROID_M1=y
+
+# fdtoverlay (host tool) - used by create-boot-script.sh to bake VU8M/i2c/spi overlays into the DTB
+BR2_PACKAGE_HOST_DTC=y
+
+# System
+BR2_PACKAGE_BATOCERA_KODI21=y
+BR2_TARGET_ROOTFS_SQUASHFS4_ZSTD=y
+
+# GPU - Mali-G52 blob (hardkernel). The kernel also builds Panfrost as an
+# unused module (matches the real device: loaded, refcount 0) but we use
+# the proprietary blob, matching what's verified working on hardware.
+BR2_PACKAGE_MALI_G52_ODROIDM1=y
+
+# No compositor (labwc/Wayland): the vendor Mali blob's Wayland-client EGL
+# platform is broken (confirmed live on hardware - eglGetPlatformDisplayEXT
+# succeeds but eglInitialize always fails with EGL_NOT_INITIALIZED, on both
+# the g13p0 blob we ship and a g24p0 blob tested as a swap-in candidate).
+# The same blob's GBM/DRM platform EGL works perfectly (labwc's own
+# server-side rendering used it without issue). Falling back to no
+# compositor makes batocera-emulationstation launch ES directly instead of
+# via labwc-launch (see batocera-emulationstation.mk), and switches
+# batocera-resolution's script type to "drm" (BR2_PACKAGE_LIBDRM fallback,
+# same as rk3326) - single active output selected via raw DRM connector
+# enumeration instead of wlr-randr, rotation falls back to ES's own
+# --screenrotate (emulationstation-standalone already branches on
+# supportSystemRotation, which batocera-resolution.drm reports as
+# unsupported). Simultaneous dual-output (HDMI+VU8M) is lost, but not
+# needed - single active output at a time is enough.
+# BR2_PACKAGE_BATOCERA_WAYLAND_LABWC is not set
+
+# libcurl was previously built with brotli support because BR2_PACKAGE_BROTLI
+# got pulled in transitively via webkitgtk -> woff2 -> brotli, and webkitgtk
+# was only reachable through the GTK backend that Wayland/labwc provided.
+# Removing labwc deselects that whole chain, but libcurl.so (unrebuilt,
+# still the old binary) keeps a hard runtime DT_NEEDED on libbrotlidec.so.1 -
+# losing the package broke curl/smbd/nmbd/emulationstation at runtime
+# (confirmed live: "error while loading shared libraries: libbrotlidec.so.1").
+# Keep brotli selected explicitly so that dependency stays satisfied.
+BR2_PACKAGE_BROTLI=y
+
+# GameCube/Wii core - package/batocera/core/batocera-system/Config.in only
+# auto-selects this for x86_64/RK3588/S922X/RPi5-class targets (stronger
+# single-thread CPU than our A55), not RK3568 - forcing it on anyway since
+# we already have GC ROMs migrated and want to try it. Known to be
+# CPU-bound even on TOPST D3-G's stronger Cortex-A72 (~18fps).
+BR2_PACKAGE_LIBRETRO_DOLPHIN=y
+
+# FBNeo core built from dsno/Zansword's Korean-patched fork (CRC-tolerant
+# driver patches for Korean-translated arcade ROMs, which the standard
+# libretro-fbneo core rejects on CRC32 mismatch) - registered as an
+# alternate "fbneo_korean" core alongside the standard one, same fbneo
+# system/ROM folder. See package/batocera/emulators/retroarch/libretro/
+# libretro-fbneo-korean/.
+BR2_PACKAGE_LIBRETRO_FBNEO_KOREAN=y
+
+# Saturn: tried enabling kronos here (upstream only selects it for x86,
+# but its .mk already supports several ARM+GLES boards via FORCE_GLES=1 -
+# added an RK3568 branch reusing the odroid-c4 GLES platform, see
+# libretro-kronos.mk). Blocked for now: LIBRETRO_KRONOS_DEPENDENCIES pulls
+# in full BR2_PACKAGE_MESA3D unconditionally, which buildroot refuses to
+# combine with BR2_PACKAGE_MESA3D_HEADERS (mesa3d-headers.mk hard-stops:
+# "mesa3d-headers enabled, but mesa3d enabled too") - that's the headers-
+# only package our vendor blob setup (mali-g52-odroidm1.mk) depends on
+# instead of full Mesa. Needs kronos.mk patched to not require full mesa3d
+# on this board (unclear yet whether it actually needs anything beyond
+# headers for the FORCE_GLES path) before this can be turned back on.
+# BR2_PACKAGE_LIBRETRO_KRONOS=y
+
+# NDS: upstream only selects libretro-melonds-ds when BR2_PACKAGE_
+# BATOCERA_XWAYLAND is set, which is off on this board (see the Wayland-
+# client EGL note above) - that gate has nothing to do with melonds-ds's
+# actual dependencies (cmake, libpcap, libstdc++ only), so force it on.
+# The older libretro-melonds (already built by default) is confirmed dead
+# on this blob (requires desktop GL, board only has GLES) - melonds-ds has
+# a Software render mode that doesn't need GL at all, worth trying.
+BR2_PACKAGE_LIBRETRO_MELONDS_DS=y
+
+# Firmware
+BR2_PACKAGE_FIRMWARE_ARMBIAN=y
+
+# choices can be put in _defconfig files only
+BR2_PACKAGE_BATOCERA_SPLASH_MPV=y

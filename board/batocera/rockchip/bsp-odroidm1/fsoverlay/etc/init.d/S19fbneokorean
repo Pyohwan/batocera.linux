@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# Seed fbneo.emulator/fbneo.core into batocera.conf on first boot, same
+# pattern as S18governor for system.cpu.governor. This is necessary
+# because /usr/share/batocera/sysconfigs/batocera.conf.<model> (the
+# per-board default file) is ONLY consulted by scripts that explicitly
+# call batocera-settings-get-master (like this one, or S18governor) -
+# EmulationStation's SystemConf and configgen's settings resolution
+# read /userdata/system/batocera.conf directly and never look at the
+# per-board sysconfig file at all. Putting fbneo.core=fbneo_korean only
+# in the sysconfig file (as first attempted) had no actual effect on
+# which core got launched - confirmed live via es_launch_stdout.log
+# still showing 'core': 'fbneo' despite the sysconfig entry.
+
+case "$1" in
+  start|restart|reload)
+    # Must check batocera.conf directly (-f), not via
+    # batocera-settings-get-master: the master resolver already falls
+    # back to the sysconfig file's fbneo.core=fbneo_korean, so it's
+    # never empty - that would make this check always skip and never
+    # actually write the key into batocera.conf, which is the one file
+    # SystemConf/configgen actually reads at game-launch time.
+    if ! /usr/bin/batocera-settings-get -f /userdata/system/batocera.conf fbneo.core >/dev/null 2>&1; then
+      /usr/bin/batocera-settings-set fbneo.emulator libretro
+      /usr/bin/batocera-settings-set fbneo.core fbneo_korean
+    fi
+    ;;
+
+  stop)
+    # Do nothing to avoid delaying shutdown
+    :
+    ;;
+
+  *)
+    echo "Usage: $0 {start|stop|restart|reload}"
+    exit 1
+    ;;
+esac

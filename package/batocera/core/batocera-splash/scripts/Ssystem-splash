@@ -47,7 +47,29 @@ do_start () {
     if [ -z "${video_rotation}" ]; then
         MODEL_CONF="/usr/share/batocera/sysconfigs/batocera.conf.${V_BOARD_MODEL}"
         if [ -f "${MODEL_CONF}" ]; then
-            video_rotation=$(awk -F'=' '/^display\.rotate\.[^=-]+=/{print $2; exit}' "${MODEL_CONF}" | tr -d '[:space:]')
+            # Match the *currently active* connector's rotate key specifically
+            # (same detection S65values4boot already uses) - a board can have
+            # more than one display.rotate.<connector> line for different
+            # outputs (e.g. a small secondary panel that needs rotating while
+            # the primary doesn't), and grabbing "whichever one happens to be
+            # first in the file" applied a completely unrelated connector's
+            # rotation to the splash (confirmed live on the ODROID-M1: with
+            # only display.rotate.DSI-1 defined, an HDMI-only boot picked
+            # that 90-degree value up and rendered the boot logo sideways).
+            effectiveDrmOutput=$(for GPU in /dev/dri/card*; do batocera-drminfo "${GPU}" "current" 2>/dev/null | grep -oP '^[0-9]+\.[0-9]+:\K[^ ]+'; done | head -1)
+            rotation_line=""
+            if [ -n "${effectiveDrmOutput}" ]; then
+                rotation_line=$(grep -E "^display\.rotate\.${effectiveDrmOutput}=" "${MODEL_CONF}" | head -1)
+            fi
+            if [ -z "${rotation_line}" ]; then
+                # No connector-specific match (or none detected yet this
+                # early in boot) - fall back to a bare "display.rotate="
+                # default if the board sysconfig defines one.
+                rotation_line=$(grep -E '^display\.rotate=' "${MODEL_CONF}" | head -1)
+            fi
+            if [ -n "${rotation_line}" ]; then
+                video_rotation=$(echo "${rotation_line}" | cut -d'=' -f2)
+            fi
         fi
     fi
 

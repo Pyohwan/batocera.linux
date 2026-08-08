@@ -1,0 +1,77 @@
+# --- Hardkernel ODROID-M1 default values ---
+# Matched at runtime via /sys/firmware/devicetree/base/model
+# ("Hardkernel ODROID-M1" -> sanitized to "Hardkernel_ODROID_M1" by
+# batocera-settings-get-master, see package/batocera/core/batocera-settings/
+# batocera-settings-get-master).
+
+# Preferred output: HDMI is the primary use case, VU8M (DSI) is a small
+# secondary panel. Without this, first boot falls back to whichever output
+# batocera-resolution enumerates first, which is not guaranteed to be HDMI.
+global.videooutput=HDMI-A-1
+
+# HDMI and VU8M are mutually exclusive - one active display at a time, not
+# a dual-monitor setup. Without this, emulationstation-standalone's own
+# "if screen2 is empty, auto-pick one" fallback treats the unset second
+# slot as an invitation to light up VU8M alongside HDMI as a second active
+# output (confirmed live: DSI-1 got auto-selected and left DPMS-on despite
+# global.videooutput naming HDMI-A-1 only).
+global.videooutput2=none
+
+# S18governor defaults to "schedutil" when this is unset (see
+# board/batocera/fsoverlay/etc/init.d/S18governor) - schedutil's reactive
+# ramp-up lags noticeably behind bursty UI load like ES menu scrolling,
+# confirmed live: FPS fluctuated 40-50 on schedutil. "performance" (all 4
+# cores pinned at max 1.99GHz) fixed it (~55-60fps), but "interactive"
+# (Android-derived, tuned specifically for bursty touch/UI-style load -
+# idles low, ramps fast on demand) matched it just as well in a live A/B
+# (mid-to-high 50s) while not sitting at max clock/power/heat during idle
+# menu time. Picked interactive over performance for that idle-efficiency
+# edge, same measured responsiveness.
+system.cpu.governor=interactive
+
+# Per-system powermode overrides (n64/fbneo/psx/nds all measurably
+# benefited from "highperformance" during gameplay - GPU-bound for N64,
+# CPU-bound for the other three) were tried here and confirmed live, but
+# removed again in favor of the user controlling `global.powermode`
+# directly via ES's own Game Settings menu (Settings > Game Settings >
+# Power Mode) - a system-specific override here would always win over
+# that menu's global choice (game > system > global precedence in
+# powermode_launch_hooks.sh), defeating the point of a single global
+# knob. See Joplin "ODROID-M1 retro OS 빌드 계획" for the underlying
+# measurements if per-system defaults are ever wanted again.
+
+# Default core for the fbneo system: dsno/Zansword's Korean-patched
+# fork (package/batocera/emulators/retroarch/libretro/
+# libretro-fbneo-korean/) instead of upstream libretro-fbneo. This
+# board carries a Korean-patched arcade ROM library (CRC-tolerant
+# driver patches for Korean-translated CPS1/CPS2/Psikyo/etc. games)
+# that the standard fbneo core rejects outright on CRC32 mismatch -
+# and the Korean fork is additive (new CRC allowances/driver entries,
+# not a removal of existing validation), so unpatched/original ROMs
+# keep working fine under it too.
+fbneo.emulator=libretro
+fbneo.core=fbneo_korean
+
+# VU8M is a portrait-mounted panel; rotate for landscape UI when it's used
+# as an output. Two different lookup keys are needed because the two
+# consumers derive the connector identifier differently:
+# - emulationstation-standalone canonicalizes settings_output to
+#   `batocera-resolution listOutputs`'s own "N - NAME" form before building
+#   the `display.rotate.<that>` key (see its _canon_output()) - on this
+#   board that's literally "1 - DSI" (confirmed live via display.log:
+#   "Rotation for output 1 - DSI: <value>"). A bare "DSI-1"/"DSI" key here
+#   (this file's previous value, carried over unverified from the old
+#   labwc-backend era) never matched and silently did nothing - screen came
+#   up unrotated every boot.
+# - Ssystem-splash/Ssplash-mpv instead use batocera-drminfo's raw
+#   abbreviated name directly ("DSI", no index prefix) - see below.
+# Rotation direction verified live on hardware: 1 (90 degrees) is correct;
+# 3 (270) came out landscape but upside-down.
+# Caveat: the "1 - " prefix is this connector's DRM object ID as currently
+# enumerated; if a kernel/DT change ever reorders connector registration,
+# this key would need updating (re-check via `batocera-resolution
+# listOutputs` on device if rotation silently stops applying again).
+display.rotate.1 - DSI=1
+# DRM rotation, for the splash screen (early boot, before ES starts) - key
+# format here is batocera-drminfo's raw name only, no index prefix.
+display.rotate.DSI=1

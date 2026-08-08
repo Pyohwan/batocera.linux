@@ -9,10 +9,35 @@ LOG_FILE="/var/log/batocera-storage.log"
 POOL_PATH="/userdata/roms"
 CONFIG_KEY="mergerfs.roms"
 BOOT_CONF_FILE="/boot/batocera-boot.conf"
-MERGERFS_OPTS="-o cache.files=partial,dropcacheonclose=true,category.create=eplfs,allow_other,inodecalc=path-hash,moveonenospc=true,minfreespace=4G"
+
+# category.search defaults to "ff" (first found branch in the pool's branch
+# list) when unset. $BASE_DIR (.roms_base, the SD card) is always listed
+# first in the pool, so any path that happens to exist on BOTH branches
+# resolves to the SD card's copy - masking the other branch entirely. This
+# bites us specifically because batocera-es-system ships small factory-demo
+# gamelist.xml/roms for several systems (gba/snes/nes/megadrive/pcengine/
+# c64/pygame etc, see S12populateshare), which get recreated onto
+# .roms_base's onto onto the same relative paths as the real, fully-scraped
+# gamelist.xml already present on the merged NVMe branch - every time
+# /userdata is wiped (SD card reflash), these masked the real gamelist
+# system-wide even though the actual ROM files/media were untouched.
+# category.search=newest picks whichever branch's copy has the newer mtime
+# for a given path instead - the real gamelist (scraped/edited well after
+# the image's fixed 2017 build-time stamp) always wins over the freshly
+# recreated factory-demo stub.
+MERGERFS_OPTS="-o cache.files=partial,dropcacheonclose=true,category.create=eplfs,category.search=newest,allow_other,inodecalc=path-hash,moveonenospc=true,minfreespace=4G"
 
 # --- HELPERS ---
 log_msg() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"; }
+
+# mergerfs is FUSE-based and needs /dev/fuse, but nothing before this script
+# in the boot sequence guarantees the fuse module is loaded (unlike
+# batocera-mount, which does this same modprobe before its own FUSE mounts).
+# Without it, every mergerfs call below fails silently with "Live mount
+# failed" and the ROM pool never gets populated - confirmed live on hardware.
+ensure_fuse_loaded() {
+    [ -e /dev/fuse ] || modprobe fuse 2>>"$LOG_FILE"
+}
 
 log_initial_info() {
     local INIT_LOCK_DIR="/tmp/batocera-storage.init.lock"
@@ -174,6 +199,46 @@ get_unique_id() {
     fi
 }
 
+# Partition-scoped counterpart to get_unique_id (which is disk-scoped by
+# design - it works off the parent disk's serial/WWN, since that's what's
+# needed to recognize "this is the same physical drive" across boots
+# regardless of which port it's plugged into). REQUEST_MERGE/"ignore
+# forever" need a per-*partition* id instead: a drive with several
+# partitions (e.g. leftover OS installs alongside the real ROMs partition)
+# must let the user permanently ignore the junk ones without that also
+# blocking the real ROMs partition on the same disk - confirmed live on
+# hardware, see the comment on CURRENT_CONFIG matching in mount_partition.
+get_partition_unique_id() {
+    local dev_path="/dev/$1"
+    local id=$(blkid -s UUID -o value "$dev_path")
+    [ -n "$id" ] && { echo "$id"; return; }
+    id=$(blkid -s PARTUUID -o value "$dev_path")
+    [ -n "$id" ] && { echo "$id"; return; }
+    # No filesystem/partition UUID at all (e.g. unformatted) - fall back to
+    # the devname, same last resort as get_unique_id.
+    echo "$1"
+}
+
+# A roms/ directory existing is not enough - any partition with an
+# incidentally-named "roms" folder (leftover installs, unrelated software)
+# was triggering a merge prompt. Require at least one subdirectory whose
+# name matches a real batocera system folder, using the on-device skeleton
+# (/usr/share/batocera/datainit/roms/<system>) as the reference list rather
+# than a hardcoded one, so it stays correct across builds/configs.
+is_valid_roms_dir() {
+    local candidate="$1"
+    local reference="/usr/share/batocera/datainit/roms"
+    [ -d "$candidate" ] || return 1
+    [ -d "$reference" ] || return 0  # reference missing - fall back to old behavior
+    local sysdir sysname
+    for sysdir in "$candidate"/*/; do
+        [ -d "$sysdir" ] || continue
+        sysname=$(basename "$sysdir")
+        [ -d "$reference/$sysname" ] && return 0
+    done
+    return 1
+}
+
 mount_partition() {
     local PART_DEV=$1
     local IGNORE_AUTOMATION=$2
@@ -238,17 +303,25 @@ mount_partition() {
     fi
 
     # Check Content & Merge
-    if [ -d "$MOUNT_POINT/roms" ]; then
+    if is_valid_roms_dir "$MOUNT_POINT/roms"; then
         log_msg "VALID: [$PART_DEV] /roms found at $MOUNT_POINT"
-        
-        if [ "$IGNORE_AUTOMATION" = true ]; then
-            log_msg "INFO: [$PART_DEV] Drive ignored. Staying mounted at $MOUNT_POINT but skipping pool."
-            return 0
-        fi
-        
+
         local BRANCH_PATH="$MOUNT_POINT/roms"
         local CURRENT_CONFIG=$(batocera-settings-get -f "$BOOT_CONF_FILE" "$CONFIG_KEY")
 
+        # A partition already explicitly merged into the pool must keep
+        # re-applying on every boot regardless of a disk-wide ignore flag.
+        # ignore.drives is disk-scoped (get_unique_id works off the parent
+        # disk, not the partition), so a drive with several partitions -
+        # e.g. leftover OS installs alongside the real ROMs partition -
+        # ends up with the *whole disk* ignored once the user dismisses the
+        # junk ones, silently blocking the already-configured ROMs
+        # partition's merge on every subsequent boot too. Confirmed live on
+        # hardware: this is exactly why a 4-partition NVMe drive's ROMs
+        # partition stopped re-merging after a reboot even though its
+        # mergerfs.roms entry was still saved. Checking "already configured"
+        # before the ignore check preserves the ignore for anything the
+        # user hasn't explicitly opted into yet.
         if [[ "$CURRENT_CONFIG" == *"$BRANCH_PATH"* ]]; then
             local CLEAN_BRANCH="${BRANCH_PATH#/}"
             if mount | grep " $POOL_PATH " | grep -q "$CLEAN_BRANCH"; then
@@ -265,22 +338,31 @@ mount_partition() {
                 touch "/tmp/mergerfs.pending"
             fi
             return 2
-        else
-            [ -n "$PENDING_FLAG_PATH" ] && touch "$PENDING_FLAG_PATH"
-            # Gather data for the GUI prompt
-            local PART_NAME=$(basename "$PART_DEV")
-            local PARENT=$(get_parent_disk "$PART_NAME")
-            local MODEL=$(lsblk -d -n -o MODEL "/dev/$PARENT")
-            local SIZE=$(lsblk -d -n -o SIZE "$PART_DEV")
-            # Clean variables
-            local MODEL_CLEAN=$(echo "$MODEL" | tr ':' '_' | xargs)
-            local SIZE_CLEAN=$(echo "$SIZE" | tr ':' '_')
-            [ -z "$MODEL_CLEAN" ] && MODEL_CLEAN="Generic Drive"
-
-            local UNIQUE_ID=$(get_unique_id "$PARENT")
-            send_notification "REQUEST_MERGE:$PART_NAME:$MODEL_CLEAN:$SIZE_CLEAN:$MOUNT_POINT:$UNIQUE_ID"
-            return 2
         fi
+
+        if [ "$IGNORE_AUTOMATION" = true ]; then
+            log_msg "INFO: [$PART_DEV] Drive ignored. Staying mounted at $MOUNT_POINT but skipping pool."
+            return 0
+        fi
+
+        [ -n "$PENDING_FLAG_PATH" ] && touch "$PENDING_FLAG_PATH"
+        # Gather data for the GUI prompt
+        local PART_NAME=$(basename "$PART_DEV")
+        local PARENT=$(get_parent_disk "$PART_NAME")
+        local MODEL=$(lsblk -d -n -o MODEL "/dev/$PARENT")
+        local SIZE=$(lsblk -d -n -o SIZE "$PART_DEV")
+        # Clean variables
+        local MODEL_CLEAN=$(echo "$MODEL" | tr ':' '_' | xargs)
+        local SIZE_CLEAN=$(echo "$SIZE" | tr ':' '_')
+        [ -z "$MODEL_CLEAN" ] && MODEL_CLEAN="Generic Drive"
+
+        # Partition-scoped, not disk-scoped (get_unique_id) - "ignore
+        # forever" on this notification's id must only ever ignore this one
+        # partition, not every other partition sharing the same physical
+        # disk (see get_partition_unique_id).
+        local UNIQUE_ID=$(get_partition_unique_id "$PART_NAME")
+        send_notification "REQUEST_MERGE:$PART_NAME:$MODEL_CLEAN:$SIZE_CLEAN:$MOUNT_POINT:$UNIQUE_ID"
+        return 2
     fi
     return 0
 }
@@ -549,20 +631,39 @@ case "$COMMAND" in
     fi
 
     # Check Pending Flag
-    PENDING_FLAG="/tmp/storage.pending.$PARENT_DISK"
+    # Scoped per-partition (not per-disk): a disk with several partitions
+    # (e.g. leftover installs from a previous OS alongside a real ROMs
+    # partition) must let each partition get its own merge/format prompt
+    # independently. A disk-wide flag here means whichever partition udev
+    # happens to enumerate first claims it and every other partition on
+    # that disk is silently skipped ("Pending flag exists") for the rest
+    # of the boot - confirmed live on hardware with a 4-partition NVMe
+    # drive, where the real ROMs partition kept losing this race.
+    PENDING_FLAG="/tmp/storage.pending.$DEVNAME"
     if [ -f "$PENDING_FLAG" ]; then
-        log_msg "SKIP: [$DEVNAME] Pending flag exists for '$PARENT_DISK'."
+        log_msg "SKIP: [$DEVNAME] Pending flag exists."
         exit 0
     fi
 
     # Check Ignore List (Disables Automation only)
     IGNORE_AUTOMATION=false
     UNIQUE_ID=$(get_unique_id "$PARENT_DISK")
-    CLEAN_ID=${UNIQUE_ID%:*} 
-    
-    if [ -n "$UNIQUE_ID" ] && [ -f "$BOOT_CONF_FILE" ]; then
+    CLEAN_ID=${UNIQUE_ID%:*}
+
+    # Partition-level id for this specific partition (empty for whole-disk
+    # events, i.e. DEVNAME == PARENT_DISK) - "ignore forever" is recorded
+    # per-partition now (see get_partition_unique_id), so this must be
+    # checked independently of the disk-level id: a sibling partition being
+    # ignored must not disable automation here.
+    PART_UNIQUE_ID=""
+    [ "$DEVNAME" != "$PARENT_DISK" ] && PART_UNIQUE_ID=$(get_partition_unique_id "$DEVNAME")
+
+    if [ -f "$BOOT_CONF_FILE" ]; then
         IGNORED_LIST=$(batocera-settings-get -f "$BOOT_CONF_FILE" "ignore.drives")
-        if [[ " $IGNORED_LIST " == *" $UNIQUE_ID "* ]] || [[ " $IGNORED_LIST " == *" $CLEAN_ID "* ]]; then
+        if [ -n "$PART_UNIQUE_ID" ] && [[ " $IGNORED_LIST " == *" $PART_UNIQUE_ID "* ]]; then
+            log_msg "INFO: [$DEVNAME] Partition (ID: $PART_UNIQUE_ID) is in boot config ignore list. Automation disabled."
+            IGNORE_AUTOMATION=true
+        elif [ -n "$UNIQUE_ID" ] && { [[ " $IGNORED_LIST " == *" $UNIQUE_ID "* ]] || [[ " $IGNORED_LIST " == *" $CLEAN_ID "* ]]; }; then
             log_msg "INFO: [$DEVNAME] Disk '$PARENT_DISK' (ID: $UNIQUE_ID) is in boot config ignore list. Automation disabled."
             IGNORE_AUTOMATION=true
         fi
@@ -653,7 +754,8 @@ case "$COMMAND" in
     FINAL_OPTS="${MERGERFS_OPTS},nonempty"
 
     log_msg "REFRESH: Executing mergerfs with: $VALID_BRANCHES"
-    
+
+    ensure_fuse_loaded
     /usr/bin/mergerfs $FINAL_OPTS "$VALID_BRANCHES" "$POOL_PATH" 2>> "$LOG_FILE"
     
     if [ $? -eq 0 ]; then
@@ -675,8 +777,8 @@ case "$COMMAND" in
     DEVICE="/dev/$DEVNAME"
     
     if [[ "$DEVNAME" =~ ^sd[a-z][0-9]*$ ]]; then PARENT_DISK="${DEVNAME%%[0-9]*}"; else PARENT_DISK=$(lsblk -no pkname "$DEVICE" 2>/dev/null); [ -z "$PARENT_DISK" ] && PARENT_DISK="$DEVNAME"; fi
-    
-    rm -f "/tmp/storage.pending.$PARENT_DISK"
+
+    rm -f "/tmp/storage.pending.$DEVNAME"
     PARENT_LOCK="/tmp/storage.runtime.disk.$PARENT_DISK"
     mkdir "$PARENT_LOCK" 2>/dev/null || true
     trap "rmdir '$PARENT_LOCK' 2>/dev/null" EXIT
@@ -727,7 +829,7 @@ case "$COMMAND" in
     sleep 2
 
     # Manually Mount
-    mount_partition "$NEW_PART" "false" "/tmp/storage.pending.$PARENT_DISK"
+    mount_partition "$NEW_PART" "false" "/tmp/storage.pending.$(basename "$NEW_PART")"
     RET=$?
 
     if [ $RET -ne 0 ] && [ $RET -ne 2 ]; then
@@ -769,8 +871,8 @@ case "$COMMAND" in
         PARENT_DISK=$(lsblk -no pkname "$DEV_SOURCE" 2>/dev/null)
         [ -z "$PARENT_DISK" ] && PARENT_DISK="$DEV_NAME"
     fi
-    
-    rm -f "/tmp/storage.pending.$PARENT_DISK"
+
+    rm -f "/tmp/storage.pending.$DEV_NAME"
 
     if ! is_mounted "$MOUNT_POINT"; then
         REAL_PATH=$(readlink -f "$MOUNT_POINT")
@@ -825,6 +927,7 @@ case "$COMMAND" in
     BRANCHES_CMD="$BASE_DIR:$FULL_BRANCHES"
     
     log_msg "MERGE: Executing mergerfs..."
+    ensure_fuse_loaded
     /usr/bin/mergerfs $MERGERFS_OPTS "$BRANCHES_CMD" "$POOL_PATH"
     
     if [ $? -eq 0 ]; then
@@ -848,8 +951,8 @@ case "$COMMAND" in
     MOUNT_POINT=$(grep "^/dev/$DEVNAME " /proc/mounts | awk '{print $2}')
     
     if [ -z "$MOUNT_POINT" ]; then
-        # If not mounted, just clear the pending flag for the parent and exit
-        rm -f "/tmp/storage.pending.$PARENT_DISK"
+        # If not mounted, just clear this partition's pending flag and exit
+        rm -f "/tmp/storage.pending.$DEVNAME"
         exit 0
     fi
 
@@ -913,7 +1016,8 @@ case "$COMMAND" in
         send_notification "NOTIFY:Rebuilding Pool..."
 
         mkdir -p "$BASE_DIR"
-        BRANCHES_CMD="$BASE_DIR:$CLEAN_CONFIG"       
+        BRANCHES_CMD="$BASE_DIR:$CLEAN_CONFIG"
+        ensure_fuse_loaded
         /usr/bin/mergerfs $MERGERFS_OPTS "$BRANCHES_CMD" "$POOL_PATH"
         
         if [ $? -eq 0 ]; then
@@ -987,13 +1091,14 @@ case "$COMMAND" in
         ID=$(get_unique_id "$D")
         if [[ "$ID" == "$UNIQUE_ID" ]] || [[ "${ID%:*}" == "$UNIQUE_ID" ]]; then
              rm -f "/tmp/storage.pending.$D"
-             $0 detect "$D" &            
+             $0 detect "$D" &
              # Trigger detection for every partition on this disk
              # This ensures handle_partition_event runs and mounts the volumes
              for part in /sys/class/block/$D/$D*; do
                  [ -e "$part" ] || continue
                  P=$(basename "$part")
                  [ "$P" == "$D" ] && continue
+                 rm -f "/tmp/storage.pending.$P"
                  log_msg "IGNORE: Re-triggering partition detection for $P"
                  $0 detect "$P" &
              done

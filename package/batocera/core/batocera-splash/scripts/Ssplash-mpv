@@ -204,10 +204,6 @@ do_videostart ()
         fi
     fi
 
-    # set the sound again due to drm init causing some cards to default to 40% volume
-    VOLUME=$(/usr/bin/batocera-settings-get audio.volume)
-    batocera-audio setSystemVolume "${VOLUME}"
-
     # On some systems, the graphics driver may take an extra moment to become fully
     # ready after detection. Check for a user-configurable delay.
     splash_delay=$(batocera-settings-get splash.delay)
@@ -235,6 +231,30 @@ do_videostart ()
 case "$1" in
     start)
         printf 'Starting %s: ' "$DAEMON"
+
+        # set the sound again due to drm init causing some cards to default to
+        # 40% volume. Moved out of do_start() (called below, only when the
+        # splash video actually plays) - splash.screen.enabled is never "1"
+        # on a genuinely fresh SD's first boot (see batocera-boot.conf sync
+        # timing elsewhere in this project), so on that boot do_start() never
+        # runs at all and this never applied either. This must run on every
+        # invocation of this script regardless of whether the video plays.
+        VOLUME=$(/usr/bin/batocera-settings-get audio.volume)
+        batocera-audio setSystemVolume "${VOLUME}"
+
+        # ODROID-M1 rk809 DAC hardware volume gets the same treatment:
+        # soundconfig (udev-triggered on the sound card's own probe, well
+        # before PipeWire starts) already sets it to 252/255 - the highest
+        # value the driver actually accepts, see soundconfig's own comment -
+        # but PipeWire/ACP claiming the card later resets it back to the
+        # driver's power-on default (~80%, -20dB), same timing as the volume
+        # reset above just affecting the ALSA mixer element PipeWire's own
+        # volume sits on top of instead of PipeWire's software volume itself.
+        if [ "$(cat /boot/boot/batocera.board 2>/dev/null)" = "bsp-odroidm1" ]; then
+            rk809_card=$(awk '/rockchiprk809co/ {print $1; exit}' /proc/asound/cards)
+            [ -n "${rk809_card}" ] && amixer -c "${rk809_card}" sset DAC 252,252 >/dev/null 2>&1
+        fi
+
         if grep -qE '^[ ]*splash.screen.enabled[ ]*=[ ]*1[ ]*$' "/boot/batocera-boot.conf"
         then
             do_start

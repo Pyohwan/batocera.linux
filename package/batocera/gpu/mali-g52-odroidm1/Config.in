@@ -1,0 +1,35 @@
+config BR2_PACKAGE_MALI_G52_ODROIDM1
+	bool "mali-g52-odroidm1"
+	depends on BR2_aarch64
+	select BR2_PACKAGE_LIBDRM
+	select BR2_PACKAGE_WAYLAND
+	select BR2_PACKAGE_HAS_LIBEGL
+	select BR2_PACKAGE_HAS_LIBGLES
+	select BR2_PACKAGE_HAS_LIBMALI
+	select BR2_PACKAGE_HAS_LIBGBM
+	select BR2_PACKAGE_MESA3D_HEADERS
+	help
+	  Install the binary user-space libraries for the ARM Mali-G52 GPU,
+	  matching the g13p0 in-kernel DDK used by the hardkernel BSP kernel
+	  on ODROID-M1 (RK3568). Requires the Mali kernel driver built into
+	  that kernel (CONFIG_MALI_BIFROST=y in the board defconfig).
+
+if BR2_PACKAGE_MALI_G52_ODROIDM1
+
+config BR2_PACKAGE_PROVIDES_LIBMALI
+	default "mali-g52-odroidm1"
+
+config BR2_PACKAGE_PROVIDES_LIBEGL
+	default "mali-g52-odroidm1"
+
+config BR2_PACKAGE_PROVIDES_LIBEGL_WAYLAND
+	bool
+	default "mali-g52-odroidm1"
+
+config BR2_PACKAGE_PROVIDES_LIBGLES
+	default "mali-g52-odroidm1"
+
+config BR2_PACKAGE_PROVIDES_LIBGBM
+	default "mali-g52-odroidm1"
+
+endif

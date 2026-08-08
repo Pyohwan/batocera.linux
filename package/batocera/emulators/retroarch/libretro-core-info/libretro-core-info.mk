@@ -49,6 +49,11 @@ define LIBRETRO_CORE_INFO_INSTALL_TARGET_CMDS
 	    imame4all_libretro.info
 	cd $(TARGET_DIR)/usr/share/libretro/info && ln -sf ep128emu_core_libretro.info \
 	    ep128emu-core_libretro.info
+	# fbneo_korean is a Korean-patched fork of fbneo (package/batocera/
+	# emulators/retroarch/libretro/libretro-fbneo-korean/) - same
+	# capabilities/extensions, no separate upstream info file exists.
+	cd $(TARGET_DIR)/usr/share/libretro/info && ln -sf fbneo_libretro.info \
+	    fbneo_korean_libretro.info
 
 	# mamevirtual_libretro.so      => no info found
 	# superflappybirds_libretro.so => no info found

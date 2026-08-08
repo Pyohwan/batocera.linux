@@ -65,6 +65,41 @@ case "${ACTION}" in
                             LC_ALL=C pactl set-default-sink INTERNAL
                             amixer -c 0 cset name='Playback Path' SPK
                             ;;
+                        "rk3568")
+                            # "rk3568" is the shared arch for every board in
+                            # this family (rock-3a, several anbernic/orangepi
+                            # boards, ...), not just ours - the rk809 codec
+                            # and the HDMI sink's sysfs-path-based name below
+                            # are specific to the ODROID-M1's hardware/DTB
+                            # and don't hold for the others (no rk809 sound
+                            # card there, HDMI sink name likely differs).
+                            # Scope to our board via batocera.board (same
+                            # mechanism the "ogu" check above uses) so this
+                            # doesn't break `set auto` on every other rk3568
+                            # board.
+                            if [[ "$BOARD" == "bsp-odroidm1" ]]; then
+                                # Follow HDMI's own DRM hotplug status rather
+                                # than whether the DSI/VU8M overlay happened
+                                # to be baked into this boot's DTB (config.ini's
+                                # overlays= - see boot.cmd). DSI panels have no
+                                # hotplug detection, so "DSI-1 present in DRM"
+                                # only ever reflected a build-time choice, not
+                                # whether a cable is actually plugged in - a
+                                # boot with no VU8M overlay and no HDMI cable
+                                # connected would still get routed to HDMI and
+                                # produce no sound. The internal speaker needs
+                                # no such check: it's a fixed onboard
+                                # component, always present whenever the board
+                                # is powered, so it's the correct default
+                                # whenever HDMI isn't actively connected.
+                                if modetest -c 2>/dev/null | awk -F'\t' '$4 ~ /^HDMI-A-1/ {print $3}' | grep -qx connected; then
+                                        MODE=alsa_output._sys_devices_platform_hdmi-sound_sound_card1.stereo-fallback
+                                else
+                                        MODE=alsa_output._sys_devices_platform_rk809-sound_sound_card0.stereo-fallback
+                                fi
+                                LC_ALL=C pactl set-default-sink "${MODE}" || exit 1
+                            fi
+                            ;;
                         *)
                             # do nothing!
                             ;;

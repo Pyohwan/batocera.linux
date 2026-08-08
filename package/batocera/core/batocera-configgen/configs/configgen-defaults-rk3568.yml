@@ -13,6 +13,31 @@ fmtowns:
 psx:
   options:
     hud_support: false # duckstation doesn't like it on n2+
+n64:
+  options:
+    hud_support: false # mupen64plus standalone + mangohud's EGL hooking:
+    # the Mali blob doesn't implement the EGL extension function(s)
+    # mangohud's inject_egl looks for, so SDL_CreateWindow fails outright
+    # ("Can't load EGL/GL library on window creation") - audio plays,
+    # video never comes up. hud_support default is true globally
+    # (configgen-defaults.yml) with no n64-specific override anywhere,
+    # so this bit every rk3568 board with no in-game FPS counter as the
+    # only symptom users could point to. ODROID-M1 confirmed on both
+    # g13p0 and g24p0 Mali blobs.
+dreamcast:
+  options:
+    hud_support: false # same mangohud+Mali blob EGL crash as n64 above,
+    # confirmed on standalone flycast (2026-08-07): SDL_CreateWindow fails
+    # ("Can't load EGL/GL library on window creation") when mangohud wraps it.
+naomi:
+  options:
+    hud_support: false # flycast core, same issue as dreamcast above
+atomiswave:
+  options:
+    hud_support: false # flycast core, same issue as dreamcast above
+systemsp:
+  options:
+    hud_support: false # flycast core, same issue as dreamcast above
 ps2:
   emulator: libretro
   core:     play

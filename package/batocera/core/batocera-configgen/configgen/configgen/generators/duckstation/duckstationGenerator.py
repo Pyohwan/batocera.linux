@@ -436,11 +436,17 @@ class DuckstationGenerator(Generator):
         dbfile = "/usr/share/duckstation/resources/gamecontrollerdb.txt"
         write_sdl_controller_db(playersControllers, dbfile)
 
-        # check if we're running wayland
+        # check if we're running wayland or X11 - boards with neither (no
+        # compositor, direct KMS/DRM like odroid-m1) need eglfs instead,
+        # otherwise Qt defaults into xcb with no X server to talk to and
+        # aborts outright (same failure class as standalone melonDS, see
+        # melonds.mk)
         if environ.get("WAYLAND_DISPLAY"):
             qt_qpa_platform = "wayland"
-        else:
+        elif environ.get("DISPLAY"):
             qt_qpa_platform = "xcb"
+        else:
+            qt_qpa_platform = "eglfs"
 
         # use their modified shaderc library
         return Command.Command(
