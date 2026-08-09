@@ -4,10 +4,16 @@ include batocera-board.common
 # the make command line doesn't reach this .config (add-defconfig
 # plumbing doesn't apply to plain <board>-build), and hand-editing the
 # generated _defconfig doesn't stick (gets regenerated from this file).
-# BR2_JLEVEL=0 (auto = nproc+1) pushed a 16-core/15GB host into ~8GB of
-# swap compiling LLVM+Mesa3D for the Panfrost experiment. Lower this (or
-# remove it) on a beefier build machine.
-BR2_JLEVEL=4
+# BR2_JLEVEL=0 (auto = nproc+1=17) pushed a 16-core/15GB host into ~8GB of
+# swap compiling LLVM+Mesa3D for the Panfrost experiment - that pairing is
+# the actual risk (LLVM's own build parallelism stacks on top of buildroot's).
+# Bumped 4->8 (2026-08-08): during a kernel-only rebuild (no LLVM/Mesa3D in
+# the dependency chain), `docker stats` showed the build container using
+# only ~2.7GiB/15GiB even at JLEVEL=4 - plenty of headroom for a plain C
+# compile. Watch `docker stats`/`free -h` again next time LLVM+Mesa3D are
+# actually in the build (fresh from-scratch image, not just this kernel
+# iteration loop) and drop back toward 4 if swap grows the same way.
+BR2_JLEVEL=8
 
 # Target definition
 BR2_aarch64=y
@@ -39,7 +45,22 @@ BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/fsoverlay $(BR2
 BR2_LINUX_KERNEL=y
 BR2_LINUX_KERNEL_CUSTOM_GIT=y
 BR2_LINUX_KERNEL_CUSTOM_REPO_URL="https://github.com/Pyohwan/linux.git"
-BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION="panfrost-enable"
+# Pinned to a commit hash, not the branch name, on purpose: buildroot's git
+# download cache keys its dl/ tarball filename off this literal string, not
+# off the commit it resolves to. With a branch name, pushing new commits to
+# panfrost-enable is invisible to buildroot forever once the first tarball
+# for that name exists - v2/v3/v4 all silently rebuilt v2's tree this way
+# (dl/linux/git's checked-out HEAD stayed at 1139cde0 through two more real
+# pushes). Bump this hash by hand after every commit meant to actually
+# change what gets built; a branch name is only safe once iteration is done.
+#
+# For active same-day DTS iteration instead, skip this pointer entirely:
+# use board/batocera/rockchip/bsp-odroidm1/local.mk.example (copy to
+# output/rk3568-odroidm1/local.mk, build with KERNEL_SRCDIR=<local kernel
+# checkout>) to build straight from the working tree via buildroot's
+# LINUX_OVERRIDE_SRCDIR - no commit/push/hash-bump per iteration. Switch
+# back to a hash pin here once a build is verified good enough to archive.
+BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION="13fcfde92b934f0dca1905fe98d976ff003cf369"
 BR2_KERNEL_HEADERS_6_1=y
 BR2_LINUX_KERNEL_USE_CUSTOM_CONFIG=y
 BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="$(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/bsp-odroidm1/linux-defconfig.config"
