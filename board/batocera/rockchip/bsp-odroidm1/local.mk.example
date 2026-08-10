@@ -9,7 +9,7 @@
 # invocation (see docker/docker.mk's KERNEL_SRCDIR opt-in) - the container
 # only sees the checkout at /kernel-src if that variable is set, e.g.:
 #
-#   make rk3568-odroidm1-build BATCH_MODE=1 KERNEL_SRCDIR=$HOME/git_projects/linux-odroidm1
+#   make rk3568-odroidm1-build BATCH_MODE=1 KERNEL_SRCDIR=/mnt/2026_990pro_2tb_1_data/git_projects/linux-odroidm1
 #
 # Why this exists: buildroot's git-download cache keys its dl/ tarball
 # filename off BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION's literal string, not
