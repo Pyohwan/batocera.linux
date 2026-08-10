@@ -23,6 +23,22 @@ else
 UID  := $(shell id -u)
 GID  := $(shell id -g)
 
+# Opt-in extra bind mount for iterative package development: point
+# KERNEL_SRCDIR (or any <NAME>_SRCDIR=<path> via EXTRA_SRCDIR_MOUNTS, see
+# below) at a local git checkout and it shows up in the container at
+# /kernel-src, ready for a <PKG>_OVERRIDE_SRCDIR=/kernel-src in local.mk
+# (see output/<board>/local.mk - BR2_PACKAGE_OVERRIDE_FILE's default
+# location). This is buildroot's own documented mechanism for "edit
+# source, rebuild, no commit/push needed" - see buildroot manual's "Using
+# Buildroot during development". Without this mount, only a version
+# string that buildroot has ALREADY cached under is enough to make it
+# silently keep reusing a stale download() forever, even after new
+# commits land upstream - this bit the odroid-m1-panfrost kernel branch
+# for two full iterations (see Joplin "buildroot 커널 캐시 오염" note).
+ifdef KERNEL_SRCDIR
+DOCKER_OPTS += -v $(KERNEL_SRCDIR):/kernel-src
+endif
+
 define RUN_DOCKER
 	$(DOCKER) run -t --init --rm \
 		-v $(PROJECT_DIR):/build \
