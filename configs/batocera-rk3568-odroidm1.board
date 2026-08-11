@@ -47,6 +47,18 @@ BR2_PACKAGE_HOST_DTC=y
 BR2_PACKAGE_BATOCERA_KODI21=y
 BR2_TARGET_ROOTFS_SQUASHFS4_ZSTD=y
 
+# Host-machine parallelism cap - BR2_JLEVEL=0 (auto = nproc+1 = 17 on the
+# LG gram build host, 16-core/15GB) OOM-killed the Claude Code process
+# itself (confirmed via journalctl: "ptyxis-spawn-...scope: A process of
+# this unit has been killed by the OOM killer") while 17-way parallel g++
+# was compiling MAME/OpenCV4/Kodi - large individual translation units,
+# not just many small ones, so wide parallelism multiplies peak per-TU
+# memory instead of just wall-clock speed. odroid-m1-panfrost hit the same
+# class of problem with LLVM+Mesa3D and capped at 4 (later loosened to 8
+# once profiling showed headroom) - this board never got the equivalent
+# cap despite also building large C++ codebases.
+BR2_JLEVEL=8
+
 # GPU - Mali-G52 blob (hardkernel). The kernel also builds Panfrost as an
 # unused module (matches the real device: loaded, refcount 0) but we use
 # the proprietary blob, matching what's verified working on hardware.
