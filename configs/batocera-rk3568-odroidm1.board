@@ -109,15 +109,34 @@ BR2_TARGET_ROOTFS_SQUASHFS4_ZSTD=y
 
 # Mesa3D with the panfrost gallium driver takes over as the HAS_LIBEGL/
 # HAS_LIBGLES/HAS_LIBGBM provider (mali-g52-odroidm1's Config.in used to
-# do this via BR2_PACKAGE_PROVIDES_LIBEGL=mali-g52-odroidm1 etc.). No
-# Vulkan driver enabled here on purpose - Joplin A/B plan explicitly
-# excludes Vulkan from this comparison (blob has none, Mesa's PanVK is
-# non-conformant on G52) to keep both sides GLES-only and comparable.
+# do this via BR2_PACKAGE_PROVIDES_LIBEGL=mali-g52-odroidm1 etc.).
 BR2_PACKAGE_MESA3D=y
 BR2_PACKAGE_MESA3D_LLVM=y
 BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_PANFROST=y
 BR2_PACKAGE_MESA3D_OPENGL_EGL=y
 BR2_PACKAGE_MESA3D_OPENGL_ES=y
+
+# PanVK (Mesa's own Panfrost Vulkan driver) - the blob (Track A) has zero
+# Vulkan support at all, so this is a B-only capability, not an A/B
+# comparison axis. The GLES-only-comparison rationale that used to be here
+# was based on an unverified "PanVK is non-conformant on G52" assumption -
+# checked Mesa 26.1.5's docs/features.txt directly: Vulkan 1.0 is listed as
+# fully DONE on panvk with no Bifrost/Valhall gen qualifier (only some 1.1+
+# extensions are gen-gated to "panvk/v10+" i.e. Valhall-only), so G52
+# (Bifrost) gets a real Vulkan 1.0 implementation, not a token/broken one.
+# Setting BR2_PACKAGE_BATOCERA_VULKAN=y directly (rather than going through
+# BR2_PACKAGE_BATOCERA_PANFROST_MESA3D, which this board doesn't use since
+# it sets granular MESA3D_* flags above instead of that meta-select) is
+# what actually flips every emulator .mk's `ifeq ($(BR2_PACKAGE_BATOCERA_
+# VULKAN),y)` build flag (flycast/beetle-psx/ppsspp/azahar/ps2/dolphin/
+# retroarch --enable-vulkan/vkquake*) - this is additive, not a replacement
+# for the existing GLES path: standalone emulators expose Vulkan as a
+# runtime-selectable gfxbackend alongside OpenGL, and retroarch cores built
+# with USE_VULKAN=ON still keep their GL renderer, Vulkan just becomes an
+# additional selectable video driver. Existing GL-path fps numbers already
+# recorded in Joplin remain valid as the default/baseline.
+BR2_PACKAGE_BATOCERA_VULKAN=y
+BR2_PACKAGE_MESA3D_VULKAN_DRIVER_PANFROST=y
 
 # No compositor (labwc/Wayland): the vendor Mali blob's Wayland-client EGL
 # platform is broken (confirmed live on hardware - eglGetPlatformDisplayEXT
@@ -188,6 +207,55 @@ BR2_PACKAGE_LIBRETRO_FBNEO_KOREAN=y
 # on this blob (requires desktop GL, board only has GLES) - melonds-ds has
 # a Software render mode that doesn't need GL at all, worth trying.
 BR2_PACKAGE_LIBRETRO_MELONDS_DS=y
+
+# Vulkan-capable systems/cores, added alongside PanVK above. All additive
+# to the existing GLES matrix (see BR2_PACKAGE_BATOCERA_VULKAN note above) -
+# none of these replace an already-tested GL path, they're either brand new
+# systems or extra selectable renderers on top of what's already recorded.
+#
+# PCSX2 (PS2) - never tested on this board before (no PS2 core at all
+# previously - libretro-play/libretro-ps2 below are the only alternatives,
+# both also new). Explicitly supports aarch64 in its own Config.in
+# (depends on BR2_x86_64 || BR2_aarch64) and needs BR2_PACKAGE_XORG7, which
+# this board already has on. Vulkan is PCSX2's modern primary renderer.
+BR2_PACKAGE_PCSX2=y
+
+# Dolphin standalone (GameCube/Wii) - distinct from libretro-dolphin above
+# (which is what this session's A/B GameCube headline case used, GL only).
+# Standalone Dolphin has its own Vulkan gfxbackend (dolphinGenerator.py
+# already wires system.config.get("gfxbackend")=="Vulkan"), a completely
+# different render path from the libretro GL backend, worth retrying here.
+BR2_PACKAGE_DOLPHIN_EMU=y
+
+# ParaLLEl-RDP N64 core - Vulkan-capable N64 renderer, not one of the 4
+# renderers (mupen64plus-next/GLideN64/glide64mk2/Rice) already tested
+# this session, all of which were GL/GLES only.
+BR2_PACKAGE_LIBRETRO_PARALLEL_N64=y
+
+# Dedicated Vulkan-only Dreamcast core (separate from libretro-flycast,
+# which is already on and GL-tested this session at 44fps/Gunbird 2).
+BR2_PACKAGE_LIBRETRO_FLYCASTVL=y
+
+# libretro PPSSPP core - distinct build from the standalone PPSSPP already
+# tested this session (GL, 30fps min/Tekken 6). Standalone's own Vulkan
+# gfxbackend is covered by BATOCERA_VULKAN above; this is an independent
+# second PSP core to compare against.
+BR2_PACKAGE_LIBRETRO_PPSSPP=y
+
+# libretro Azahar (3DS) core - no 3DS system was buildable on this board
+# before at all (standalone azahar was never enabled either).
+BR2_PACKAGE_LIBRETRO_AZAHAR=y
+
+# Play!/libretro-ps2 - additional PS2 core options alongside PCSX2 above.
+BR2_PACKAGE_LIBRETRO_PLAY=y
+BR2_PACKAGE_LIBRETRO_PS2=y
+
+# vkquake/vkquake2/vkquake3 need no explicit line here - batocera-system's
+# Config.in auto-selects all three once BR2_PACKAGE_BATOCERA_VULKAN=y is
+# set (vkquake2 additionally needs BR2_PACKAGE_XORG7, already on; vkquake3
+# is only excluded on JH7110 targets, which this board isn't). These are
+# native Vulkan-only ports with no GL fallback at all - impossible on the
+# blob (Track A) by construction, not just untested.
 
 # Firmware
 BR2_PACKAGE_FIRMWARE_ARMBIAN=y
