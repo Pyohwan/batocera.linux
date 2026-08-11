@@ -233,8 +233,19 @@ BR2_PACKAGE_DOLPHIN_EMU=y
 BR2_PACKAGE_LIBRETRO_PARALLEL_N64=y
 
 # Dedicated Vulkan-only Dreamcast core (separate from libretro-flycast,
-# which is already on and GL-tested this session at 44fps/Gunbird 2).
-BR2_PACKAGE_LIBRETRO_FLYCASTVL=y
+# which is already on and GL-tested this session at 44fps/Gunbird 2) -
+# tried and reverted. libretro-flycastvl.mk only has ARM platform/ARCH
+# branches wired up for specific boards (RPi4/5, RK3326, H3/H5/H6, ...);
+# this board (rk3568/odroidm1) isn't one of them, so it silently falls
+# through to the x86_64 default LIBRETRO_PLATFORM, which drags in xbyak's
+# x86 JIT code unconditionally - confirmed via a real build failure
+# ("fatal error: cpuid.h: No such file or directory" compiling
+# core/hw/aica/dsp_x64.cpp). This is a genuinely stale, unmaintained fork
+# (pinned commit from Oct 2021) that would need real upstream-style ARM
+# platform wiring to fix properly, and libretro-flycast above already
+# covers Dreamcast/Vulkan once built with BATOCERA_VULKAN=y - not worth
+# patching a 5-year-stale duplicate for. Left off.
+# BR2_PACKAGE_LIBRETRO_FLYCASTVL is not set
 
 # libretro PPSSPP core - distinct build from the standalone PPSSPP already
 # tested this session (GL, 30fps min/Tekken 6). Standalone's own Vulkan
