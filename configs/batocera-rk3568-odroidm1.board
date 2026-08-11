@@ -257,15 +257,16 @@ BR2_PACKAGE_LIBRETRO_PS2=y
 # These are native Vulkan-only ports with no GL fallback at all - impossible
 # on the blob (Track A) by construction, not just untested.
 #
-# vkquake2 is the one exception: unlike vkquake/vkquake3, its Config.in
-# unconditionally selects BR2_PACKAGE_LIBGLU (desktop GLU, not just Vulkan),
-# which needs BR2_PACKAGE_HAS_LIBGL - false on this board (Panfrost only
-# provides GLES/EGL, no GLX, same reason TRX/dolphin-libretro are excluded
-# above). buildroot hard-stops the build over this ("libgl is in the
-# dependency chain of libglu... without selecting it or depending on it
-# from Config.in. Stop.") rather than just warning, so vkquake2 has to be
-# turned back off explicitly despite BATOCERA_VULKAN auto-selecting it.
-# BR2_PACKAGE_VKQUAKE2 is not set
+# vkquake2 is the one exception: it builds ref_gl.so *and* ref_vk.so side
+# by side (real dual-renderer engine, not vestigial), so it genuinely needs
+# desktop GLU/GLX - not available here (Panfrost only provides GLES/EGL,
+# same reason TRX/dolphin-libretro are excluded above). A first build
+# attempt confirmed a hard buildroot stop over this ("libgl is in the
+# dependency chain of libglu... Stop.") - a defconfig "is not set" line
+# can't override batocera-system's forced `select`, so fixed at the real
+# root cause instead: added "&& BR2_PACKAGE_HAS_LIBGL" to vkquake2's
+# auto-select condition in batocera-system/Config.in (this was a latent
+# gap there - nothing GLES-only-with-Vulkan existed to expose it before).
 
 # Firmware
 BR2_PACKAGE_FIRMWARE_ARMBIAN=y

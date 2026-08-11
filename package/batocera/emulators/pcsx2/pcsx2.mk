@@ -24,7 +24,11 @@ PCSX2_SUPPORTS_IN_SOURCE_BUILD = NO
 PCSX2_DEPENDENCIES += alsa-lib ecm fmt freetype host-clang host-libcurl kddockwidgets
 PCSX2_DEPENDENCIES += libaio libbacktrace libcurl libgtk3 libpcap libpng libsamplerate
 PCSX2_DEPENDENCIES += libsoundtouch plutosvg portaudio qt6base qt6svg qt6tools
-PCSX2_DEPENDENCIES += rapidyaml shaderc sdl3 webp wxwidgets xorgproto yaml-cpp zlib
+PCSX2_DEPENDENCIES += rapidyaml shaderc sdl3 webp xorgproto yaml-cpp zlib
+
+ifeq ($(BR2_PACKAGE_HAS_LIBGL),y)
+PCSX2_DEPENDENCIES += wxwidgets
+endif
 
 # Use clang for performance
 PCSX2_CONF_OPTS += -DCMAKE_C_COMPILER=$(HOST_DIR)/bin/clang
