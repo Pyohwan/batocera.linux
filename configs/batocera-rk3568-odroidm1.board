@@ -257,9 +257,16 @@ BR2_PACKAGE_LIBRETRO_PPSSPP=y
 # before at all (standalone azahar was never enabled either).
 BR2_PACKAGE_LIBRETRO_AZAHAR=y
 
-# Play!/libretro-ps2 - additional PS2 core options alongside PCSX2 above.
+# Play! - additional PS2 core option alongside PCSX2 above.
 BR2_PACKAGE_LIBRETRO_PLAY=y
-BR2_PACKAGE_LIBRETRO_PS2=y
+
+# libretro-ps2 tried and reverted: its own CMakeLists.txt/BuildParameters.
+# cmake can't identify our cross-compile target at all ("Unsupported
+# architecture: unknown", confirmed via a real build failure) - a deeper
+# upstream CMake arch-detection issue, not a quick one-line fix like the
+# other cores above. PS2 is already covered twice over by PCSX2 and
+# libretro-play, so not worth chasing a third path for.
+# BR2_PACKAGE_LIBRETRO_PS2 is not set
 
 # vkquake/vkquake3 need no explicit line here - batocera-system's Config.in
 # auto-selects both once BR2_PACKAGE_BATOCERA_VULKAN=y is set (vkquake3 is
