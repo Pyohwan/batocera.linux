@@ -39,8 +39,8 @@ systemsp:
   options:
     hud_support: false # flycast core, same issue as dreamcast above
 ps2:
-  emulator: libretro
-  core:     play
+  emulator: pcsx2
+  core:     pcsx2
 flash:
   emulator: lightspark
   core:     lightspark
