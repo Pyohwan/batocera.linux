@@ -128,6 +128,41 @@ BR2_PACKAGE_LIBRETRO_FBNEO_KOREAN=y
 # a Software render mode that doesn't need GL at all, worth trying.
 BR2_PACKAGE_LIBRETRO_MELONDS_DS=y
 
+# Track C (g29p1 Vulkan blob + Wayland, see project memory
+# project_odroid_retro_track_c_v3.md) systems/cores. No BATOCERA_VULKAN/
+# MESA3D_VULKAN_DRIVER_* line here - unlike B's PanVK, this board's Vulkan
+# comes from the g29p1 blob itself (mali.json ICD written by hand once the
+# blob is swapped in, not a buildroot-selectable Mesa driver) - so nothing
+# to select at the Kconfig level for that part, it's a runtime/package
+# addition to mali-g52-odroidm1.mk once gate 1/2 pass. These system/core
+# enables are GPU-driver-independent and were already confirmed to build
+# on B (cherry-picked selects only, not the PanVK-specific lines):
+#
+# PCSX2 (PS2) - never tested on this board before B. Needs BR2_PACKAGE_
+# HAS_LIBGL fixed above (see vkquake2/pcsx2 desktop-GL commit) to avoid
+# pulling in wxwidgets/libglu on this GLES-only board.
+BR2_PACKAGE_PCSX2=y
+
+# Dolphin standalone (GameCube/Wii) - distinct from libretro-dolphin above
+# (GL only). Has its own Vulkan gfxbackend option once g29p1 is in.
+BR2_PACKAGE_DOLPHIN_EMU=y
+
+# ParaLLEl-RDP N64 core - Vulkan-only renderer, needs the RK3568 arch
+# branch fix (see libretro-parallel-n64.mk commit) to cross-compile aarch64.
+BR2_PACKAGE_LIBRETRO_PARALLEL_N64=y
+
+# libretro Azahar (3DS) - no 3DS system was buildable on this board before.
+BR2_PACKAGE_LIBRETRO_AZAHAR=y
+
+# libretro PPSSPP core - distinct build from the standalone PPSSPP (already
+# on by default). Standalone's own Vulkan gfxbackend needs the RK3568
+# allowlist fix (see ppsspp.mk ARM_NO_VULKAN commit).
+BR2_PACKAGE_LIBRETRO_PPSSPP=y
+
+# Dropped on B, not re-added here: libretro-flycastvl (stale fork, no ARM
+# platform wiring), libretro-ps2/libretro-play (CMake arch-detection
+# failure / not in es_systems.yml). See B's commits 04c0e462f6/5f1cf74e76.
+
 # Firmware
 BR2_PACKAGE_FIRMWARE_ARMBIAN=y
 
