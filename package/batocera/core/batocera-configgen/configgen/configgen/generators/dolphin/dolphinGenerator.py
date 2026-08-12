@@ -429,12 +429,25 @@ class DolphinGenerator(Generator):
         if state_filename := system.config.get('state_filename'):
             commandArray.extend(["--save_state", state_filename])
 
+        # check if we're running wayland or X11 - boards with neither (no
+        # compositor, direct KMS/DRM like odroid-m1) need eglfs instead,
+        # otherwise Qt defaults into xcb with no X server to talk to and
+        # aborts outright (same failure class as standalone duckstation-qt/
+        # pcsx2-qt, see duckstationGenerator.py/pcsx2Generator.py)
+        if environ.get("WAYLAND_DISPLAY"):
+            qt_qpa_platform = "wayland"
+        elif environ.get("DISPLAY"):
+            qt_qpa_platform = "xcb"
+        else:
+            qt_qpa_platform = "eglfs"
+
         return Command.Command(
             array=commandArray,
             env={
                 "XDG_CONFIG_HOME": CONFIGS,
                 "XDG_DATA_HOME": SAVES,
-                "XDG_CACHE_HOME": CACHE
+                "XDG_CACHE_HOME": CACHE,
+                "QT_QPA_PLATFORM": qt_qpa_platform
             }
         )
 
