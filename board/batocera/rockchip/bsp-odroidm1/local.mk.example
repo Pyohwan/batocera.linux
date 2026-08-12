@@ -1,6 +1,8 @@
 # Copy (or symlink) this file to output/rk3568-odroidm1/local.mk to build
 # the kernel straight from a live local checkout instead of downloading
-# Pyohwan/linux's panfrost-enable branch - skips buildroot's
+# Pyohwan/linux's fix-hdmi-dsi-dual-livelock branch (BSP 6.1, same kernel
+# as A/B - track C doesn't change kernel branch, see project memory
+# project_odroid_retro_track_c_v3.md §7) - skips buildroot's
 # download/extract steps entirely. Edit the kernel source, then
 # `make linux-rebuild all`, no commit/push needed per iteration.
 #
