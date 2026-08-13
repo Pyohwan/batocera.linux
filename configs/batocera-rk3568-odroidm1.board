@@ -79,7 +79,13 @@ BR2_PACKAGE_MALI_G52_ODROIDM1=y
 # supportSystemRotation, which batocera-resolution.drm reports as
 # unsupported). Simultaneous dual-output (HDMI+VU8M) is lost, but not
 # needed - single active output at a time is enough.
-# BR2_PACKAGE_BATOCERA_WAYLAND_LABWC is not set
+# Track C reintroduces labwc, reversing A/B's GBM/KMSDRM-direct decision
+# above: gate 1 (g29p1 blob accepted by vendor kbase, 2026-08-12) passed,
+# and blob Vulkan's only display path is VK_KHR_display, which PanVK also
+# has and still fails to create a surface with on this board (B, 2026-08-
+# 11) - Wayland is the only Vulkan output path left to try. See
+# project_odroid_retro_track_c_v3.md for the full gate 1/2 rationale.
+BR2_PACKAGE_BATOCERA_WAYLAND_LABWC=y
 
 # libcurl was previously built with brotli support because BR2_PACKAGE_BROTLI
 # got pulled in transitively via webkitgtk -> woff2 -> brotli, and webkitgtk

@@ -111,19 +111,33 @@ define MALI_G52_ODROIDM1_INSTALL_STAGING_CMDS
 	# eglplatform.h logic, so patch its staged copy the same way.
 	grep -q MESA_EGL_NO_X11_HEADERS $(STAGING_DIR)/usr/include/EGL/eglplatform.h || \
 		sed -i '1a #define MESA_EGL_NO_X11_HEADERS 1' $(STAGING_DIR)/usr/include/EGL/eglplatform.h
-	# This vendor gbm.h (2022-03 snapshot) predates upstream Mesa's standard
-	# name for per-plane DMA-BUF export: it only declares the fd itself as
-	# gbm_bo_get_fd_per_plane (confirmed still exported under that name by
-	# nm -D on libmali.so.1.9.0), not the gbm_bo_get_fd_for_plane name
-	# wlroots >= 0.18 actually calls. Same function/signature, alias it.
+	# This vendor gbm.h never declares gbm_bo_get_fd_for_plane, the name
+	# upstream Mesa standardized on and wlroots >= 0.18 actually calls -
+	# g13p0-era blobs only exported the pre-standardization name
+	# (gbm_bo_get_fd_per_plane) under the hood, so this used to always
+	# inject a declare-and-alias-the-old-name macro. g24p0's
+	# libmali.so.1.9.0 has since started exporting gbm_bo_get_fd_for_plane
+	# directly (confirmed via nm -D) - the vendor's header text just never
+	# caught up - so aliasing to per_plane unconditionally now points at a
+	# symbol that no longer exists in the .so, breaking the link instead of
+	# fixing it (invisible until wlroots, the first real caller of this
+	# symbol on this board, failed with "undefined reference to
+	# gbm_bo_get_fd_per_plane"). Check the actual exported symbol table so
+	# this keeps working across blob versions either way: alias only if the
+	# .so genuinely lacks the modern name, otherwise just declare it (the
+	# .so already has it, only the header prototype is missing).
 	# Insert right before the closing "#ifdef __cplusplus / }" block (the
 	# second occurrence) so it stays inside both extern "C" and the
 	# include guard, instead of a blind end-of-file append.
 	if ! grep -q gbm_bo_get_fd_for_plane $(STAGING_DIR)/usr/include/gbm.h; then \
+		if nm -D $(STAGING_DIR)/usr/lib/libmali.so.1.9.0 | grep -q ' T gbm_bo_get_fd_for_plane$$'; then \
+			DECL='int\ngbm_bo_get_fd_for_plane(struct gbm_bo *bo, int plane);\n\n'; \
+		else \
+			DECL='int\ngbm_bo_get_fd_per_plane(struct gbm_bo *bo, int plane);\n#define gbm_bo_get_fd_for_plane gbm_bo_get_fd_per_plane\n\n'; \
+		fi; \
 		LINE=$$(grep -n '^#ifdef __cplusplus' $(STAGING_DIR)/usr/include/gbm.h | tail -1 | cut -d: -f1); \
 		head -n $$((LINE-1)) $(STAGING_DIR)/usr/include/gbm.h > $(STAGING_DIR)/usr/include/gbm.h.new; \
-		printf 'int\ngbm_bo_get_fd_per_plane(struct gbm_bo *bo, int plane);\n#define gbm_bo_get_fd_for_plane gbm_bo_get_fd_per_plane\n\n' \
-			>> $(STAGING_DIR)/usr/include/gbm.h.new; \
+		printf "$$DECL" >> $(STAGING_DIR)/usr/include/gbm.h.new; \
 		tail -n +$$LINE $(STAGING_DIR)/usr/include/gbm.h >> $(STAGING_DIR)/usr/include/gbm.h.new; \
 		mv $(STAGING_DIR)/usr/include/gbm.h.new $(STAGING_DIR)/usr/include/gbm.h; \
 	fi
