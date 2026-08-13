@@ -88,8 +88,23 @@ define MALI_G52_ODROIDM1_EXTRACT_CMDS
 	# anything else) meant to be fixed up at runtime by libmali-hook /
 	# mali-priority.sh: not something a static link at build time can
 	# rely on. libmali.so.1.9.0 exports every symbol directly (EGL,
-	# GLESv1/2, GBM, wayland-egl - confirmed each with nm -D).
-	for lib in EGL:1 GLESv1_CM:1 GLESv2:2 MaliOpenCL:1 gbm:1 wayland-egl:1; do \
+	# GLESv1/2, GBM - confirmed each with nm -D).
+	#
+	# wayland-egl is NOT in this list (was, up to track C): it doesn't
+	# belong to the GPU driver at all - wl_egl_window_* is pure struct
+	# bookkeeping (a malloc'd width/height/surface-pointer record the EGL
+	# platform code reads directly), not a real driver entry point, so
+	# it's the upstream wayland.org project's own reference impl that
+	# ships it - and buildroot's plain "wayland" package already builds
+	# and installs a real, working libwayland-egl.so.1 (confirmed via
+	# nm -D: wl_egl_window_create/destroy/resize/get_attached_size all
+	# present). g29p1 doesn't export any of these under either name
+	# (confirmed via nm -D on the raw blob) - aliasing to libmali.so.1.9.0
+	# like the others silently overwrote wayland's real implementation
+	# with a broken one, only noticed once track C turned Wayland on and
+	# something that actually creates an EGL window surface (kodi, then
+	# libgtk3's Wayland GDK backend) tried to link against it.
+	for lib in EGL:1 GLESv1_CM:1 GLESv2:2 MaliOpenCL:1 gbm:1; do \
 		name=$${lib%%:*}; ver=$${lib##*:}; \
 		ln -sf libmali.so.1.9.0 $(@D)/usr/lib/aarch64-linux-gnu/lib$${name}.so.$${ver}; \
 		ln -sf lib$${name}.so.$${ver} $(@D)/usr/lib/aarch64-linux-gnu/lib$${name}.so; \
