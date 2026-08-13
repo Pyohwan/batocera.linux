@@ -87,6 +87,22 @@ BR2_PACKAGE_MALI_G52_ODROIDM1=y
 # project_odroid_retro_track_c_v3.md for the full gate 1/2 rationale.
 BR2_PACKAGE_BATOCERA_WAYLAND_LABWC=y
 
+# libgtk3 defaults its Wayland GDK backend to on whenever BR2_PACKAGE_
+# WAYLAND + HAS_LIBEGL are both present (true here as of labwc above) -
+# pcsx2 pulls in libgtk3 unconditionally (LIBGTK3, not the wayland
+# suboption specifically). g29p1 exports the EGL platform functions GTK
+# actually calls through (eglGetPlatformDisplay/eglInitialize/
+# eglCreatePlatformWindowSurface all present, confirmed via nm -D) but
+# not wl_egl_window_create/resize/destroy - the separate libwayland-egl
+# convenience wrapper some clients (GTK's GDK backend among them) build
+# against instead of calling the platform functions directly. Nothing
+# on this board provides those symbols (no working Mesa here, and the
+# blob doesn't export them either), so libgtk3-wayland fails to link
+# ("undefined reference to wl_egl_window_resize" etc.) - X11 stays on
+# via BR2_PACKAGE_XORG7, so this only drops GTK's Wayland-specific GDK
+# backend, not GTK itself.
+# BR2_PACKAGE_LIBGTK3_WAYLAND is not set
+
 # libcurl was previously built with brotli support because BR2_PACKAGE_BROTLI
 # got pulled in transitively via webkitgtk -> woff2 -> brotli, and webkitgtk
 # was only reachable through the GTK backend that Wayland/labwc provided.
