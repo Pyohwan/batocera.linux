@@ -3,28 +3,24 @@
 # mali-g52-odroidm1
 #
 ################################################################################
-# Userspace blob is g24p0 (DDK generation newer than the g13p0 the hardkernel
-# BSP kernel's kbase was originally paired with) - live-tested on real
-# hardware by swapping just this file against our unchanged 6.1 kernel/kbase
-# first: no kbase UK-ABI mismatch, ES/EGL init and rendering all fine. Picked
-# over the LinuxFactory-distributed g13p0 .deb (still the peripheral-files
-# source below - OpenCL vendor JSON/profile.d, unrelated to blob version) for
-# the extra EGL 1.5 surface it exposes (eglGetPlatformDisplay natively, plus
-# EGL_EXT_platform_base/EGL_KHR_platform_gbm/EGL_ANDROID_native_fence_sync
-# strings confirmed present via nm/strings) - g13p0 lacks these, which is
-# what excluded moonlight-qt from this board's build and is suspected (not
-# confirmed) as part of the mangohud/SDL_CreateWindow EGL interaction bug.
-# Source: https://github.com/JeffyCN/mirrors, "libmali" branch - the
-# Rockchip-community-standard libmali distribution (other mirrors sync from
-# it). Pinned to a specific commit rather than the branch HEAD for
-# reproducible builds.
-MALI_G52_ODROIDM1_G24P0_COMMIT = 077bc8f582c5da0cb80136a711ce3be2fa1a04cd
-MALI_G52_ODROIDM1_G24P0_SOURCE = libmali-bifrost-g52-g24p0-wayland-gbm.so
-MALI_G52_ODROIDM1_G24P0_SITE = https://raw.githubusercontent.com/JeffyCN/mirrors/$(MALI_G52_ODROIDM1_G24P0_COMMIT)/lib/aarch64-linux-gnu
+# Track C: userspace blob is g29p1, the unified GLES+Vulkan build (DDK
+# generation newer than g24p0, which A/B use) - gate 1 (2026-08-12) live-
+# swapped just this file on an A image against our unchanged 6.1 kernel/
+# kbase: no UK-ABI mismatch, GLES survived (ES System Info showed real
+# GLSL ES 3.20/GL_VERSION strings), and vulkaninfo enumerated the GPU
+# ("Mali-G52", DRIVER_ID_ARM_PROPRIETARY) - vendor g25p0 kbase accepts
+# g29p1 userspace as-is, no out-of-tree kbase module needed (see
+# project_odroid_retro_track_c_v3.md gate 1/light-path). Source:
+# https://github.com/JeffyCN/mirrors, "libmali-next" branch (not "libmali"
+# - g29p1 isn't published on the branch g24p0 used). Pinned to a specific
+# commit rather than the branch HEAD for reproducible builds.
+MALI_G52_ODROIDM1_G29P1_COMMIT = 4233031d818e97a19e8a9cdbbd5c15795ededd93
+MALI_G52_ODROIDM1_G29P1_SOURCE = libmali-bifrost-g52-g29p1.so
+MALI_G52_ODROIDM1_G29P1_SITE = https://raw.githubusercontent.com/JeffyCN/mirrors/$(MALI_G52_ODROIDM1_G29P1_COMMIT)/lib/aarch64-linux-gnu
 
 # Peripheral files only (OpenCL vendor ICD JSON, profile.d, copyright) still
 # come from the LinuxFactory g13p0 .deb - the actual libmali.so.1.9.0 binary
-# extracted from it gets overwritten with the g24p0 blob above in
+# extracted from it gets overwritten with the g29p1 blob above in
 # EXTRACT_CMDS, same live-tested swap, just made to persist across rebuilds.
 MALI_G52_ODROIDM1_VERSION = 1.9-5+202604211715~resolute
 MALI_G52_ODROIDM1_SOURCE = libmali-bifrost-g52-g13p0-wayland-gbm_$(MALI_G52_ODROIDM1_VERSION)_arm64.deb
@@ -45,7 +41,7 @@ MALI_G52_ODROIDM1_DEPENDENCIES = libdrm wayland mesa3d-headers
 # doesn't ship.
 MALI_G52_ODROIDM1_HEADERS_VERSION = ad4c28932c3d07c75fc41dd4a3333f9013a25e7f
 MALI_G52_ODROIDM1_EXTRA_DOWNLOADS = https://github.com/batocera-linux/rockchip-packages/releases/download/20220303/libmali-$(MALI_G52_ODROIDM1_HEADERS_VERSION).tar.gz
-MALI_G52_ODROIDM1_EXTRA_DOWNLOADS += $(MALI_G52_ODROIDM1_G24P0_SITE)/$(MALI_G52_ODROIDM1_G24P0_SOURCE)
+MALI_G52_ODROIDM1_EXTRA_DOWNLOADS += $(MALI_G52_ODROIDM1_G29P1_SITE)/$(MALI_G52_ODROIDM1_G29P1_SOURCE)
 
 define MALI_G52_ODROIDM1_EXTRACT_CMDS
 	$(AR) --output=$(@D) -x $(MALI_G52_ODROIDM1_DL_DIR)/$(MALI_G52_ODROIDM1_SOURCE)
@@ -73,11 +69,11 @@ define MALI_G52_ODROIDM1_EXTRACT_CMDS
 	# convention this file is essentially a placeholder (GLES3 extensions
 	# are declared in GLES2/gl2ext.h instead) - ship that standard content.
 	cp $(MALI_G52_ODROIDM1_PKGDIR)/gl3ext.h $(@D)/usr/include/GLES3/gl3ext.h
-	# Overwrite the g13p0 binary the .deb shipped with the g24p0 blob -
+	# Overwrite the g13p0 binary the .deb shipped with the g29p1 blob -
 	# same filename (libmali.so.1.9.0), so every symlink/pkgconfig/
 	# ld.so.preload path below still applies unchanged. Live-tested this
 	# exact swap on real hardware first (see header comment).
-	cp $(MALI_G52_ODROIDM1_DL_DIR)/$(MALI_G52_ODROIDM1_G24P0_SOURCE) \
+	cp $(MALI_G52_ODROIDM1_DL_DIR)/$(MALI_G52_ODROIDM1_G29P1_SOURCE) \
 		$(@D)/usr/lib/aarch64-linux-gnu/libmali.so.1.9.0
 	# On a real dpkg system these top-level sonames get created by
 	# update-alternatives at install time (nothing in this .deb's own
