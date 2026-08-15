@@ -59,6 +59,11 @@ ifeq ($(BR2_PACKAGE_BATOCERA_WAYLAND),y)
 DOLPHIN_EMU_CONF_OPTS += -DENABLE_QT=OFF
 DOLPHIN_EMU_CONF_OPTS += -DENABLE_NOGUI=ON
 DOLPHIN_EMU_CONF_OPTS += -DENABLE_WAYLAND=ON
+# This older source tree's bundled Externals (e.g. enet) declare
+# cmake_minimum_required() below 3.5, which current CMake rejects outright
+# rather than just warning (matches ROCKNIX's own package.mk, which carries
+# the same flag for this exact commit).
+DOLPHIN_EMU_CONF_OPTS += -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 else
 ifeq ($(BR2_PACKAGE_QT6),y)
 DOLPHIN_EMU_DEPENDENCIES += qt6base qt6svg
