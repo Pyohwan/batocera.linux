@@ -1455,7 +1455,13 @@ config BR2_PACKAGE_BATOCERA_CONSOLE_SYSTEMS
 	# PSX
 	select BR2_PACKAGE_DUCKSTATION    if BR2_PACKAGE_BATOCERA_GLES3 && \
 	                                     !BR2_PACKAGE_BATOCERA_TARGET_RK3326 && \
-										 !BR2_PACKAGE_BATOCERA_TARGET_S9GEN4
+										 !BR2_PACKAGE_BATOCERA_TARGET_S9GEN4 && \
+										 # duckstation.mk pulls in full BR2_PACKAGE_MESA3D once
+										 # BATOCERA_VULKAN is on, which mesa3d-headers.mk (used
+										 # by vendor-blob boards instead of full Mesa) hard-stops
+										 # the build if combined with - see ODROID-M1 Track C
+										 # board notes / project memory for the live conflict.
+										 !(BR2_PACKAGE_MESA3D_HEADERS && BR2_PACKAGE_BATOCERA_VULKAN)
 										 # newer versions of duckstation are stricter on OpenGL 3.1
 										 # requires X11 or Sway. 2GB boards aren't great.
 
