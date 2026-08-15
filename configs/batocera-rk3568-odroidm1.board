@@ -180,8 +180,13 @@ BR2_PACKAGE_PCSX2=y
 # (GL only). Has its own Vulkan gfxbackend option once g29p1 is in.
 BR2_PACKAGE_DOLPHIN_EMU=y
 
-# ParaLLEl-RDP N64 core - Vulkan-only renderer, needs the RK3568 arch
-# branch fix (see libretro-parallel-n64.mk commit) to cross-compile aarch64.
+# parallel-n64 core, needs the RK3568 arch branch fix (see
+# libretro-parallel-n64.mk commit) to cross-compile aarch64. NOTE: despite
+# the core's name, its ParaLLEl-RDP Vulkan renderer is gated to AMD64 only
+# upstream (confirmed live: /proc/PID/maps never loads libvulkan.so here,
+# and cross-checked against ROCKNIX's own libretro packaging, which gates
+# it the same way) - this core only ever runs its GL path on ARM. N64 is
+# already well covered by mupen64plus-next (GLES) on this board instead.
 BR2_PACKAGE_LIBRETRO_PARALLEL_N64=y
 
 # libretro Azahar (3DS) - no 3DS system was buildable on this board before.
