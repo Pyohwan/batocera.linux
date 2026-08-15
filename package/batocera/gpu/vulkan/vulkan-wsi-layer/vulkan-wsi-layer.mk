@@ -31,16 +31,29 @@ VULKAN_WSI_LAYER_DEPENDENCIES = libdrm wayland-protocols vulkan-loader vulkan-he
 # that heap doesn't exist on this BSP 6.1 kernel - confirmed live, this
 # board's /dev/dma_heap/ only has "reserved", "system", "system-uncached"
 # (a different DMA-heap exporter/naming scheme than whatever ROCKNIX's own
-# kernel registers under "linux,cma"). "system" is the generic CMA-backed
-# general-purpose heap here.
-VULKAN_WSI_LAYER_DMA_HEAP = system
+# kernel registers under "linux,cma"). Using "system-uncached" per
+# ginkage's (ROCKNIX vulkan-wsi-layer sync.patch author) own README
+# recommendation - "system" is a cached page-allocator heap (NOT
+# CMA/contiguous, despite what an earlier version of this comment said),
+# and a cached heap risks coherency artefacts (tearing/corruption) on
+# buffers shared between the GPU and the compositor without a cache flush
+# in between.
+VULKAN_WSI_LAYER_DMA_HEAP = system-uncached
 #
 # KERNEL_HEADER_DIR needs the *configured* kernel source tree (drm_utils
 # includes kernel DRM/fourcc headers directly, not the installed userspace
 # uapi headers) - $(LINUX_DIR) is buildroot's own extracted+configured
 # linux package dir, already built by the time this package builds since
 # it's declared as a dependency above.
+# TEMPORARY for bring-up: util/log.cpp's WSI_LOG_ERROR/WARNING calls are
+# compiled out entirely under NDEBUG (see util/log.hpp's wsi_log_enable),
+# which is why VULKAN_WSI_DEBUG_LEVEL was silently a no-op throughout the
+# initial investigation - buildroot's cmake-package defaults to
+# CMAKE_BUILD_TYPE=Release (-DNDEBUG). Force Debug here until the Vulkan
+# surface/swapchain path is confirmed stable end-to-end, then remove this
+# line (revert to buildroot's default Release) in a follow-up commit.
 VULKAN_WSI_LAYER_CONF_OPTS = \
+	-DCMAKE_BUILD_TYPE=Debug \
 	-DVULKAN_CXX_INCLUDE=$(STAGING_DIR)/usr/include \
 	-DBUILD_WSI_HEADLESS=OFF \
 	-DBUILD_WSI_WAYLAND=ON \
