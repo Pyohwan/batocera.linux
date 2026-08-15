@@ -135,14 +135,28 @@ BR2_PACKAGE_LIBRETRO_FBNEO_KOREAN=y
 BR2_PACKAGE_LIBRETRO_MELONDS_DS=y
 
 # Track C (g29p1 Vulkan blob + Wayland, see project memory
-# project_odroid_retro_track_c_v3.md) systems/cores. No BATOCERA_VULKAN/
-# MESA3D_VULKAN_DRIVER_* line here - unlike B's PanVK, this board's Vulkan
-# comes from the g29p1 blob itself (mali.json ICD written by hand once the
-# blob is swapped in, not a buildroot-selectable Mesa driver) - so nothing
-# to select at the Kconfig level for that part, it's a runtime/package
-# addition to mali-g52-odroidm1.mk once gate 1/2 pass. These system/core
-# enables are GPU-driver-independent and were already confirmed to build
-# on B (cherry-picked selects only, not the PanVK-specific lines):
+# project_odroid_retro_track_c_v3.md) systems/cores.
+#
+# BR2_PACKAGE_BATOCERA_VULKAN is needed here despite this board's Vulkan
+# coming from the g29p1 blob itself (mali.json ICD written by hand once
+# the blob is swapped in), not a buildroot-selectable Mesa driver -
+# initially left off on the (correct as far as it went) reasoning that
+# there was "nothing to select at the Kconfig level" for the driver, but
+# that option gates more than just Mesa Vulkan driver selection: it's
+# also what registers PPSSPP's gfxbackend.ppsspp.emulator.yml (the
+# Graphics API/Vulkan choice in ES's own PSP options menu never appeared
+# without it - confirmed live, ES only showed OpenGL) and selects
+# VKQUAKE/VKQUAKE2/VKQUAKE3/QT6BASE_VULKAN. Confirmed safe on this board:
+# every BR2_PACKAGE_MESA3D_VULKAN_DRIVER_* select it pulls in is itself
+# gated behind other targets (X86/RPi/PANFROST_MESA3D/FREEDRENO_MESA3D)
+# that don't match rk3568/bsp-odroidm1, so enabling this adds only the
+# generic vulkan-tools/spirv-tools/shaderc packages plus the above
+# Vulkan-native ports/UI options, no conflicting Mesa driver.
+BR2_PACKAGE_BATOCERA_VULKAN=y
+#
+# These system/core enables are GPU-driver-independent and were already
+# confirmed to build on B (cherry-picked selects only, not the
+# PanVK-specific lines):
 #
 # PCSX2 (PS2) - never tested on this board before B. Needs BR2_PACKAGE_
 # HAS_LIBGL fixed above (see vkquake2/pcsx2 desktop-GL commit) to avoid
