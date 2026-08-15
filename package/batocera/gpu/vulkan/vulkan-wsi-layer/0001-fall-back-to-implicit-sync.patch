@@ -107,24 +107,49 @@ diff --git a/wsi/wayland/surface_properties.cpp b/wsi/wayland/surface_properties
 index 31ddc68..96b7729 100644
 --- a/wsi/wayland/surface_properties.cpp
 +++ b/wsi/wayland/surface_properties.cpp
-@@ -89,7 +89,7 @@ VkResult surface_properties::get_surface_capabilities(VkPhysicalDevice physical_
- 
+@@ -28,6 +28,7 @@
+ #define __STDC_VERSION__ 0
+ #endif
+
++#include <cstdio>
+ #include <wayland-client.h>
+ #include <linux-dmabuf-unstable-v1-client-protocol.h>
+
+@@ -89,7 +90,7 @@ VkResult surface_properties::get_surface_capabilities(VkPhysicalDevice physical_
+
     /* Composite alpha */
     pSurfaceCapabilities->supportedCompositeAlpha = static_cast<VkCompositeAlphaFlagBitsKHR>(
 -      VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR | VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR);
 +      VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR | VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR | VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR);
     return VK_SUCCESS;
  }
- 
-@@ -338,7 +338,7 @@ static bool check_wl_protocols(struct wl_display *display)
+
+@@ -338,7 +339,11 @@ static bool check_wl_protocols(struct wl_display *display)
        return false;
     }
- 
+
 -   return (supported.dmabuf && supported.explicit_sync);
-+   return (supported.dmabuf /* && supported.explicit_sync */);
++   /* explicit_sync (zwp_linux_explicit_synchronization_v1) is optional: newer
++    * wlroots (0.20+) dropped it in favour of linux-drm-syncobj-v1 and never
++    * advertises it, but the dma-buf's own implicit kernel fence still keeps
++    * presentation correct without it - see surface::init(). */
++   return supported.dmabuf;
  }
- 
+
  VWL_VKAPI_CALL(VkBool32)
+@@ -365,6 +370,12 @@ static bool check_wl_protocols(struct wl_display *display)
+ CreateWaylandSurfaceKHR(VkInstance instance, const VkWaylandSurfaceCreateInfoKHR *pCreateInfo,
+                         const VkAllocationCallbacks *pAllocator, VkSurfaceKHR *pSurface) VWL_API_POST
+ {
++   /* Give any Wayland traffic the client already queued (e.g. the initial
++    * xdg_surface commit) a chance to be flushed/processed before we open
++    * our own event queue and start querying compositor state - without
++    * this, surface init intermittently fails (observed as
++    * VK_ERROR_OUT_OF_HOST_MEMORY here). */
++   wl_display_roundtrip(pCreateInfo->display);
+    auto &instance_data = layer::instance_private_data::get(instance);
+    util::allocator allocator{ instance_data.get_allocator(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT, pAllocator };
+    auto wsi_surface = surface::make_surface(allocator, pCreateInfo->display, pCreateInfo->surface);
 diff --git a/wsi/wayland/swapchain.cpp b/wsi/wayland/swapchain.cpp
 index 91cb23f..254fdbd 100644
 --- a/wsi/wayland/swapchain.cpp
