@@ -180,6 +180,19 @@ define MALI_G52_ODROIDM1_INSTALL_TARGET_CMDS
 	# every process's global scope via ld.so.preload (confirmed fix,
 	# tested live via LD_PRELOAD) sidesteps whatever the exact defect is.
 	echo "/usr/lib/libmali.so.1.9.0" >> $(TARGET_DIR)/etc/ld.so.preload
+	# The g13p0 .deb this package's peripheral files come from ships no
+	# Vulkan ICD manifest at all (unlike the sibling mali-G52 package's
+	# source, which needed 001-fix-vulkan-icd-path.patch for one that DID
+	# exist) - without this, the Khronos loader reports "Found no
+	# drivers!" and every Vulkan app fails at vkCreateInstance with
+	# VK_ERROR_INCOMPATIBLE_DRIVER, regardless of vulkan-loader/
+	# vulkan-wsi-layer being otherwise correctly set up. Confirmed via a
+	# live single-binary test (VK_LOADER_DEBUG=all showed the exact
+	# "Found no drivers!" message) - this had only ever been patched in
+	# live via manual scp during earlier debugging, never captured here.
+	mkdir -p $(TARGET_DIR)/usr/share/vulkan/icd.d
+	$(INSTALL) -D -m 0644 $(MALI_G52_ODROIDM1_PKGDIR)/mali.icd.json \
+		$(TARGET_DIR)/usr/share/vulkan/icd.d/mali.json
 endef
 
 $(eval $(generic-package))
