@@ -1,5 +1,19 @@
 config BR2_PACKAGE_DUCKSTATION
 	bool "duckstation"
+	# Same class of conflict as Saturn kronos (see project_odroid_retro
+	# memory / Track C board notes): this package's own .mk pulls in a
+	# real BR2_PACKAGE_MESA3D dependency once BATOCERA_VULKAN is on, but
+	# mesa3d-headers.mk (what vendor-blob boards like this one use
+	# instead of full Mesa) hard-stops the whole build if both are
+	# enabled at once ("mesa3d-headers enabled, but mesa3d enabled
+	# too"). batocera-system/Config.in unconditionally selects this
+	# package for GLES3 boards, and a plain "is not set" in a board
+	# defconfig cannot override a select - only a failed depends-on can,
+	# which is what this line does (Kconfig silently drops a select
+	# whose target's own depends-on is unmet, at most a WARNING, same as
+	# the harmless GStreamer OpenGL warnings already seen on this
+	# board's build).
+	depends on !(BR2_PACKAGE_MESA3D_HEADERS && BR2_PACKAGE_BATOCERA_VULKAN)
 	select BR2_PACKAGE_DUCKSTATION_COMMON
 	select BR2_PACKAGE_BATOCERA_QT6
 	select BR2_PACKAGE_FMT

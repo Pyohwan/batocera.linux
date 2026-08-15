@@ -196,19 +196,19 @@ BR2_PACKAGE_LIBRETRO_PPSSPP=y
 # platform wiring), libretro-ps2/libretro-play (CMake arch-detection
 # failure / not in es_systems.yml). See B's commits 04c0e462f6/5f1cf74e76.
 
-# standalone duckstation - defaults on upstream, but its
-# BR2_PACKAGE_BATOCERA_VULKAN branch adds a real BR2_PACKAGE_MESA3D
-# dependency that its own Config.in never selects/depends-on (buildroot's
-# legality check fails the whole board build the moment BATOCERA_VULKAN=y,
-# confirmed live once we turned that flag on for Track C). Also already
-# abandoned on A/B for a separate, unrelated reason (Qt/eglfs can't host
+# standalone duckstation - defaults on for GLES3 boards via
+# batocera-system/Config.in's unconditional select, which a plain
+# "is not set" here can't override. Same class of mesa3d/blob Kconfig
+# conflict as Saturn kronos above once BATOCERA_VULKAN is on (its .mk
+# needs full BR2_PACKAGE_MESA3D, which hard-conflicts with this board's
+# BR2_PACKAGE_MESA3D_HEADERS-only blob setup) - fixed at the real source
+# with a depends-on guard in duckstation/Config.in itself (Kconfig drops
+# a select whose target's depends-on is unmet). Also already abandoned
+# on A/B for a separate, unrelated reason (Qt/eglfs can't host
 # duckstation-qt's multi-widget window structure without a compositor -
 # "Failed to get window info from widget", see project memory) - PSX is
 # already covered by libretro swanstation (the actual recommended core,
-# 58fps+ software-rendered). Disabling here avoids a real mesa3d/blob
-# Kconfig conflict (same class of problem as Saturn kronos, see B track)
-# rather than trying to make an already-abandoned frontend build.
-# BR2_PACKAGE_DUCKSTATION is not set
+# 58fps+ software-rendered).
 
 # Firmware
 BR2_PACKAGE_FIRMWARE_ARMBIAN=y
