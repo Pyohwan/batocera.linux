@@ -154,6 +154,19 @@ BR2_PACKAGE_LIBRETRO_MELONDS_DS=y
 # Vulkan-native ports/UI options, no conflicting Mesa driver.
 BR2_PACKAGE_BATOCERA_VULKAN=y
 #
+# The g29p1 blob's Vulkan ICD only implements VK_KHR_display (bare DRM, no
+# compositor) among windowing-system surface extensions - confirmed live
+# via vulkaninfo's Instance Extensions list, no VK_KHR_wayland_surface at
+# all. Without this layer, every Vulkan app's own surface/device creation
+# for a Wayland window fails outright (confirmed live: PPSSPP's SDL2
+# window creation succeeded once SDL2 itself got Vulkan support enabled,
+# but PPSSPP's own Vulkan backend init then failed and silently fell back
+# to another backend) even though vulkaninfo enumerates the GPU fine.
+# ROCKNIX carries the exact same fix for the same blob/board family
+# (RK3566/g29p1) - see package/batocera/gpu/vulkan/vulkan-wsi-layer/ for
+# the full writeup and version pin.
+BR2_PACKAGE_VULKAN_WSI_LAYER=y
+#
 # These system/core enables are GPU-driver-independent and were already
 # confirmed to build on B (cherry-picked selects only, not the
 # PanVK-specific lines):
