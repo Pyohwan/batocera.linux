@@ -64,6 +64,14 @@ DOLPHIN_EMU_CONF_OPTS += -DENABLE_WAYLAND=ON
 # rather than just warning (matches ROCKNIX's own package.mk, which carries
 # the same flag for this exact commit).
 DOLPHIN_EMU_CONF_OPTS += -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+# This source predates fmt's compile-time format-string API overhaul (it
+# was written against the fmt 9.1.0 it bundles in Externals/fmt) and fails
+# to build against this board's shared system fmt (12.1.0 - fmt::detail::
+# is_compile_string and the FMT_COMPILE_STRING conversion path it relies on
+# are gone). CMakeLists.txt already falls back to the bundled Externals/fmt
+# whenever find_package(fmt) doesn't find one, so force that fallback
+# instead of chasing fmt's internal API across 3 major versions.
+DOLPHIN_EMU_CONF_OPTS += -DCMAKE_DISABLE_FIND_PACKAGE_fmt=TRUE
 else
 ifeq ($(BR2_PACKAGE_QT6),y)
 DOLPHIN_EMU_DEPENDENCIES += qt6base qt6svg
