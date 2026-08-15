@@ -92,6 +92,18 @@ else
     DOLPHIN_EMU_CONF_OPTS += -DENABLE_X11=OFF
 endif
 
+ifeq ($(BR2_PACKAGE_BATOCERA_WAYLAND),y)
+# Override the XORG7-based ENABLE_X11=ON above (last -D wins on the CMake
+# command line): this board's blob GPU driver only ships mesa3d-headers
+# (GLES/EGL/Vulkan), not full mesa3d/libGL, so there's no GL/glx.h - the
+# legacy elseif(ENABLE_X11) GLX.cpp path in Common/CMakeLists.txt fails to
+# even find the header (confirmed via a failed single-package build). We
+# don't need X11/XWayland at all here: EGLWayland.cpp (added by the
+# Wayland patch) already covers native EGL, and Vulkan goes through
+# vulkan-wsi-layer's Wayland surface support directly.
+DOLPHIN_EMU_CONF_OPTS += -DENABLE_X11=OFF
+endif
+
 ifeq ($(BR2_PACKAGE_BATOCERA_VULKAN),y)
     DOLPHIN_EMU_CONF_OPTS += -DENABLE_VULKAN=ON
 else
