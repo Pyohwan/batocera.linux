@@ -1,0 +1,104 @@
+--- a/Source/Core/DolphinNoGUI/PlatformWayland.cpp
++++ b/Source/Core/DolphinNoGUI/PlatformWayland.cpp
+@@ -39,6 +39,7 @@
+   bool Init() override;
+   void SetTitle(const std::string& string) override;
+   void MainLoop() override;
++  void RequestFullscreenIfNeeded() override;
+ 
+   WindowSystemInfo GetWindowSystemInfo() const;
+ 
+@@ -135,6 +136,17 @@
+   PlatformWayland* platform = static_cast<PlatformWayland*>(data);
+   platform->m_surface_width = width;
+   platform->m_surface_height = height;
++
++  // Init() pinned window_geometry to the small startup size (and whatever
++  // xpos/ypos Dolphin defaults to) before fullscreen was ever requested.
++  // xdg-shell clients are expected to keep window_geometry in sync with
++  // their actual content size - leaving it stale after a resize (e.g. the
++  // transition to fullscreen) makes the compositor keep clipping/
++  // positioning the surface to that old small rect, which is why the
++  // rendered content ended up cropped into a corner instead of covering
++  // the whole (now much bigger) surface. Keep it matched to the new size.
++  xdg_surface_set_window_geometry(platform->m_xdg_surface, 0, 0, width, height);
++
+   if (g_renderer)
+     g_renderer->ResizeSurface(width, height);
+   //if (g_controller_interface.IsInit())
+@@ -227,6 +239,34 @@
+   xdg_toplevel_set_title(m_xdg_toplevel, string.c_str());
+ }
+ 
++void PlatformWayland::RequestFullscreenIfNeeded()
++{
++  // Batocera always writes [Display] Fullscreen into dolphin.ini (see
++  // configgen's dolphinGenerator.py), but Config isn't loaded yet during
++  // Init() - UICommon::Init() (which actually reads Dolphin.ini) only runs
++  // afterwards in MainNoGUI.cpp, so Config::Get() during Init() only ever
++  // saw the compiled-in default (false). This is called once main() has
++  // called UICommon::Init(), so the real ini value is available - request
++  // fullscreen here instead, which is still valid per xdg-shell even after
++  // the initial surface commit.
++  if (Config::Get(Config::MAIN_FULLSCREEN))
++  {
++    xdg_toplevel_set_fullscreen(m_xdg_toplevel, nullptr);
++
++    // The caller (MainNoGUI's main()) uses GetWindowSystemInfo() right
++    // after this call to size the swapchain for the whole session via
++    // BootManager::BootCore() - it never re-queries later. Block here
++    // until the compositor's resulting configure event (the one that
++    // updates m_surface_width/height to the real fullscreen size) has
++    // actually been processed, so that first swapchain is already
++    // correctly sized instead of relying on a subsequent ResizeSurface()
++    // call to fix it up (which silently no-ops via the `if (g_renderer)`
++    // check below if it fires before the renderer exists yet - it always
++    // does, this early in startup).
++    wl_display_roundtrip(m_display);
++  }
++}
++
+ void PlatformWayland::MainLoop()
+ {
+   while (IsRunning())
+--- a/Source/Core/DolphinNoGUI/Platform.h
++++ b/Source/Core/DolphinNoGUI/Platform.h
+@@ -22,6 +22,11 @@
+   virtual void SetTitle(const std::string& title);
+   virtual void MainLoop() = 0;
+ 
++  // Called once after UICommon::Init() (i.e. once the ini-file config is
++  // actually loaded) so platforms can apply settings - like [Display]
++  // Fullscreen - that weren't available yet during Init() itself.
++  virtual void RequestFullscreenIfNeeded() {}
++
+   virtual WindowSystemInfo GetWindowSystemInfo() const = 0;
+ 
+   // Requests a graceful shutdown, from SIGINT/SIGTERM.
+--- a/Source/Core/DolphinNoGUI/MainNoGUI.cpp
++++ b/Source/Core/DolphinNoGUI/MainNoGUI.cpp
+@@ -267,10 +267,22 @@
+     return 1;
+   }
+ 
+-  const WindowSystemInfo wsi = s_platform->GetWindowSystemInfo();
+-
+   UICommon::SetUserDirectory(user_directory);
+   UICommon::Init();
++
++  // Dolphin.ini's [Display] Fullscreen is only actually loaded once
++  // UICommon::Init() has run - platforms that need it (Wayland) apply it
++  // here rather than during Platform::Init(), which runs before this.
++  // This must also happen *before* GetWindowSystemInfo() below: that call's
++  // result is what BootManager::BootCore() uses to size the actual
++  // swapchain, and on Wayland it only reflects the real (fullscreen) size
++  // if the compositor's resulting configure event has already been
++  // processed - otherwise every boot silently creates the swapchain at
++  // whatever the small pre-fullscreen default was.
++  s_platform->RequestFullscreenIfNeeded();
++
++  const WindowSystemInfo wsi = s_platform->GetWindowSystemInfo();
++
+   UICommon::InitControllers(wsi);
+ 
+   Common::ScopeGuard ui_common_guard([] {
