@@ -117,7 +117,21 @@ define DOLPHIN_EMU_PRE_CONFIGURE_HOOK
     sed -i 's/set(DOLPHIN_VERSION_MINOR .*)/set(DOLPHIN_VERSION_MINOR "$(DOLPHIN_EMU_VERSION_MINOR)")/' \
         $(@D)/CMake/ScmRevGen.cmake
 endef
-DOLPHIN_EMU_PRE_CONFIGURE_HOOKS = DOLPHIN_EMU_PRE_CONFIGURE_HOOK
+DOLPHIN_EMU_PRE_CONFIGURE_HOOKS += DOLPHIN_EMU_PRE_CONFIGURE_HOOK
+endif
+
+ifeq ($(BR2_PACKAGE_BATOCERA_WAYLAND),y)
+# Externals/VulkanMemoryAllocator's bundled header (as of this old commit)
+# uses snprintf without including <cstdio> - this toolchain's stricter
+# libstdc++ doesn't pull it in transitively like whatever ROCKNIX built
+# against. Same class of missing-include fix as ROCKNIX's own
+# pre_configure_target() sed (which patches this exact file for
+# cstdint/string) - confirmed via a failed single-package build.
+define DOLPHIN_EMU_FIX_VMA_HEADER
+    sed -i '1i #include <cstdio>' \
+        $(@D)/Externals/VulkanMemoryAllocator/include/vk_mem_alloc.h
+endef
+DOLPHIN_EMU_PRE_CONFIGURE_HOOKS += DOLPHIN_EMU_FIX_VMA_HEADER
 endif
 
 define DOLPHIN_EMU_INI
