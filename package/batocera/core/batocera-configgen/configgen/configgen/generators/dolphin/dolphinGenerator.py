@@ -423,7 +423,12 @@ class DolphinGenerator(Generator):
             # use the -b 'batch' option for nicer exit
             commandArray = ["dolphin-emu", "-b", "-e", rom]
         else:
-            commandArray = ["dolphin-emu-nogui", "-e", rom]
+            # NoGUI-only build (Wayland boards - see dolphin-emu.mk): needs an
+            # explicit --platform, it doesn't probe WAYLAND_DISPLAY/DISPLAY
+            # itself like Qt does, and defaults to x11 if left unset.
+            nogui_platform = "wayland" if environ.get("WAYLAND_DISPLAY") else "x11"
+            nogui_video_backend = dolphinSettings.get("Core", "GFXBackend")
+            commandArray = ["dolphin-emu-nogui", "-p", nogui_platform, "-v", nogui_video_backend, "-e", rom]
 
         # state_slot option
         if state_filename := system.config.get('state_filename'):
