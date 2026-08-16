@@ -1,0 +1,35 @@
+--- a/src/video/SDL_egl.c
++++ b/src/video/SDL_egl.c
+@@ -21,6 +21,8 @@
+ #include "../SDL_internal.h"
+ 
+ #ifdef SDL_VIDEO_OPENGL_EGL
++#include <stdio.h>
++#include <time.h>
+ 
+ #if defined(SDL_VIDEO_DRIVER_WINDOWS) || defined(SDL_VIDEO_DRIVER_WINRT)
+ #include "../core/windows/SDL_windows.h"
+@@ -1178,6 +1180,23 @@
+     if (!_this->egl_data->eglSwapBuffers(_this->egl_data->egl_display, egl_surface)) {
+         return SDL_EGL_SetError("unable to show color buffer in an OS-native window", "eglSwapBuffers");
+     }
++
++    /* frametime logger (env FRAMETIME_LOG) */
++    {
++        static FILE *ft_log; static int ft_init;
++        if (!ft_init) {
++            const char *p = SDL_getenv("FRAMETIME_LOG");
++            if (p) ft_log = fopen(p, "w");
++            ft_init = 1;
++        }
++        if (ft_log) {
++            struct timespec ts_;
++            clock_gettime(CLOCK_MONOTONIC, &ts_);
++            fprintf(ft_log, "%lld\n",
++                    (long long)(ts_.tv_sec * 1000000LL + ts_.tv_nsec / 1000));
++        }
++    }
++
+     return 0;
+ }
+ 
