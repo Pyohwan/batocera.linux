@@ -142,6 +142,7 @@
     <windowRule identifier="pcsx2-qt" serverDecoration="yes" />
     <windowRule identifier="pcsx2-qt">
       <action name="ToggleFullscreen" />
+      <action name="Focus" />
     </windowRule>
     <windowRule identifier="info.cemu.Cemu" serverDecoration="yes" />
     <windowRule identifier="rpcs3" serverDecoration="yes" />
