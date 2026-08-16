@@ -2288,6 +2288,8 @@ ps2:
   hardware: console
   extensions: [iso, mdf, nrg, bin, img, dump, gz, cso, chd, m3u, zso]
   emulators:
+    aethersx2:
+      aethersx2: { requireAnyOf: [BR2_PACKAGE_AETHERSX2], incompatible_extensions: [m3u] }
     pcsx2:
       pcsx2: { requireAnyOf: [BR2_PACKAGE_PCSX2], incompatible_extensions: [m3u] }
     libretro:

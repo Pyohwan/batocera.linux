@@ -144,6 +144,9 @@
       <action name="ToggleFullscreen" />
       <action name="Focus" />
     </windowRule>
+    <windowRule identifier="*" title="AetherSX2*">
+      <action name="Focus" />
+    </windowRule>
     <windowRule identifier="info.cemu.Cemu" serverDecoration="yes" />
     <windowRule identifier="rpcs3" serverDecoration="yes" />
     <windowRule identifier="net.shadps4.shadPS4" serverDecoration="yes" />

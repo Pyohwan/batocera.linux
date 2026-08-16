@@ -1,0 +1,16 @@
+cores:
+  aethersx2:
+    shared_features:
+      - powermode
+      - tdp
+      - videomode
+      - bezel
+      - bezel_stretch
+      - hud
+      - hud_corner
+      - use_guns
+      - use_wheels
+systems:
+  - name: ps2
+    exclude_extensions:
+      - m3u

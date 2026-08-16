@@ -1,0 +1,22 @@
+config BR2_PACKAGE_AETHERSX2
+	bool "aethersx2"
+	depends on BR2_aarch64
+	select BR2_PACKAGE_BATOCERA_QT6
+	select BR2_PACKAGE_LIBGPG_ERROR
+	select BR2_PACKAGE_LIBPCAP
+	select BR2_PACKAGE_LIBCURL
+	help
+	  AetherSX2 is a prebuilt aarch64 PlayStation 2 emulator binary,
+	  vendored as-is from ROCKNIX (same one they ship as the default PS2
+	  core on RK3566 boards). Its GS renderer is an older branch (hardened
+	  for Android-era Adreno/Mali by Tahlreth) that avoids the real Mali
+	  G52 GPU hardware fault (DATA_INVALID_FAULT) that newer mainline
+	  PCSX2-derived forks (including the bmdhacks fork this board's own
+	  pcsx2 package uses) hit on this g29p1 blob - live-tested 5+ minutes
+	  fault-free where bmdhacks/pcsx2 reliably faults within ~100s.
+
+	  Personal-build only: not upstream-contributable due to AetherSX2's
+	  past GPL dispute history (bmdhacks was adopted upstream as the
+	  replacement for exactly that reason).
+
+	  https://github.com/ROCKNIX/packages
