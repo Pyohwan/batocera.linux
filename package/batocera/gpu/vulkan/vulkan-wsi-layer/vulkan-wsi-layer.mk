@@ -45,15 +45,17 @@ VULKAN_WSI_LAYER_DMA_HEAP = system-uncached
 # uapi headers) - $(LINUX_DIR) is buildroot's own extracted+configured
 # linux package dir, already built by the time this package builds since
 # it's declared as a dependency above.
-# TEMPORARY for bring-up: util/log.cpp's WSI_LOG_ERROR/WARNING calls are
-# compiled out entirely under NDEBUG (see util/log.hpp's wsi_log_enable),
-# which is why VULKAN_WSI_DEBUG_LEVEL was silently a no-op throughout the
-# initial investigation - buildroot's cmake-package defaults to
-# CMAKE_BUILD_TYPE=Release (-DNDEBUG). Force Debug here until the Vulkan
-# surface/swapchain path is confirmed stable end-to-end, then remove this
-# line (revert to buildroot's default Release) in a follow-up commit.
+# util/log.cpp's WSI_LOG_ERROR/WARNING calls are compiled out entirely
+# under NDEBUG (see util/log.hpp's wsi_log_enable), which is why
+# VULKAN_WSI_DEBUG_LEVEL was silently a no-op during the initial bring-up
+# investigation - buildroot's cmake-package defaults to
+# CMAKE_BUILD_TYPE=Release (-DNDEBUG). CMAKE_BUILD_TYPE=Debug was forced
+# here until the Vulkan surface/swapchain path was confirmed stable
+# end-to-end (now true - full system matrix tested clean, see
+# project_odroid_retro.md) - reverted to buildroot's default Release since
+# this layer sits in every Wayland Vulkan present on this board, and a
+# Debug build's extra logging isn't valid ground for A/B/C fps comparison.
 VULKAN_WSI_LAYER_CONF_OPTS = \
-	-DCMAKE_BUILD_TYPE=Debug \
 	-DVULKAN_CXX_INCLUDE=$(STAGING_DIR)/usr/include \
 	-DBUILD_WSI_HEADLESS=OFF \
 	-DBUILD_WSI_WAYLAND=ON \
