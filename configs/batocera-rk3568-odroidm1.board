@@ -20,6 +20,11 @@ BR2_aarch64=y
 BR2_cortex_a55=y
 BR2_ARM_FPU_NEON_FP_ARMV8=y
 BR2_PACKAGE_BATOCERA_TARGET_RK3568=y
+# This dedicated target's own board identity, distinct from
+# BR2_PACKAGE_UBOOT_ODROID_M1 (also set by the shared 11-board
+# batocera-rk3568.board target, which builds an odroid-m1 image variant
+# too - not a valid "is this our dedicated target" proxy).
+BR2_PACKAGE_BATOCERA_TARGET_BSP_ODROIDM1=y
 BR2_TARGET_OPTIMIZATION="-pipe -fsigned-char"
 BR2_TARGET_GENERIC_GETTY_BAUDRATE_115200=y
 # NOT rk3568/patches: its ffmpeg/mpv patches add v4l2-request HEVC support
