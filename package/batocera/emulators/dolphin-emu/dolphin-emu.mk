@@ -3,16 +3,26 @@
 # dolphin-emu
 #
 ################################################################################
-# On Wayland boards, the stock commit below has no VK_USE_PLATFORM_WAYLAND_KHR
-# support at all (confirmed via source read: VulkanLoader.h/VKSwapChain.cpp
-# only handle Win32/Xlib/Android/Metal) - Vulkan surface creation fails
-# outright under labwc/Wayland. ROCKNIX hits the exact same gap on their own
-# Wayland+Vulkan RK3566 devices and solves it by pinning a newer upstream
-# commit plus their own "add-wayland" patch series (verified: applies clean
-# with `patch -p1`, no fuzz beyond padorder/git/bios-dir housekeeping patches
-# - see ODROID-M1 Track C notes). We mirror that combo here rather than
-# hand-porting the patch onto the older commit.
-ifeq ($(BR2_PACKAGE_BATOCERA_WAYLAND),y)
+# On this board (Wayland+Vulkan), the stock commit below has no
+# VK_USE_PLATFORM_WAYLAND_KHR support at all (confirmed via source read:
+# VulkanLoader.h/VKSwapChain.cpp only handle Win32/Xlib/Android/Metal) -
+# Vulkan surface creation fails outright under labwc/Wayland. ROCKNIX hits
+# the exact same gap on their own Wayland+Vulkan RK3566 devices and solves
+# it by pinning a newer upstream commit plus their own "add-wayland" patch
+# series (verified: applies clean with `patch -p1`, no fuzz beyond
+# padorder/git/bios-dir housekeeping patches - see ODROID-M1 Track C notes).
+# We mirror that combo here rather than hand-porting the patch onto the
+# older commit.
+#
+# Gated on BR2_PACKAGE_BATOCERA_TARGET_BSP_ODROIDM1 specifically, not the
+# generic BR2_PACKAGE_BATOCERA_WAYLAND (shared by every Wayland Batocera
+# board, e.g. x86_64/RK3588/RPi5) - that would silently downgrade dolphin
+# and swap all of them onto this older commit's patch directory too. Since
+# buildroot's pkg-patches-dirs picks a version-subdir over the flat one
+# when both exist, that would also drop the flat-level 005/006/009/011/012
+# patches for every other Wayland board (kept only for the newer commit's
+# patch dir below).
+ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_BSP_ODROIDM1),y)
 DOLPHIN_EMU_VERSION = e6583f8bec814d8f3748f1d7738457600ce0de56
 else
 # Version: Commits on Jun 25, 2026
@@ -92,7 +102,7 @@ else
     DOLPHIN_EMU_CONF_OPTS += -DENABLE_X11=OFF
 endif
 
-ifeq ($(BR2_PACKAGE_BATOCERA_WAYLAND),y)
+ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_BSP_ODROIDM1),y)
 # Override the XORG7-based ENABLE_X11=ON above (last -D wins on the CMake
 # command line): this board's blob GPU driver only ships mesa3d-headers
 # (GLES/EGL/Vulkan), not full mesa3d/libGL, so there's no GL/glx.h - the
@@ -101,6 +111,10 @@ ifeq ($(BR2_PACKAGE_BATOCERA_WAYLAND),y)
 # don't need X11/XWayland at all here: EGLWayland.cpp (added by the
 # Wayland patch) already covers native EGL, and Vulkan goes through
 # vulkan-wsi-layer's Wayland surface support directly.
+#
+# Board-specific (not generic BR2_PACKAGE_BATOCERA_WAYLAND): a Wayland
+# board with a full mesa3d/libGL stack has a real glx.h and may actually
+# want X11/XWayland, so this shouldn't force it off for them too.
 DOLPHIN_EMU_CONF_OPTS += -DENABLE_X11=OFF
 endif
 
@@ -120,13 +134,17 @@ endef
 DOLPHIN_EMU_PRE_CONFIGURE_HOOKS += DOLPHIN_EMU_PRE_CONFIGURE_HOOK
 endif
 
-ifeq ($(BR2_PACKAGE_BATOCERA_WAYLAND),y)
+ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_BSP_ODROIDM1),y)
 # Externals/VulkanMemoryAllocator's bundled header (as of this old commit)
 # uses snprintf without including <cstdio> - this toolchain's stricter
 # libstdc++ doesn't pull it in transitively like whatever ROCKNIX built
 # against. Same class of missing-include fix as ROCKNIX's own
 # pre_configure_target() sed (which patches this exact file for
 # cstdint/string) - confirmed via a failed single-package build.
+#
+# Gated the same as the DOLPHIN_EMU_VERSION swap above (not generic
+# BR2_PACKAGE_BATOCERA_WAYLAND): this file only exists in this old
+# commit's tree, which only this board builds.
 define DOLPHIN_EMU_FIX_VMA_HEADER
     sed -i '1i #include <cstdio>' \
         $(@D)/Externals/VulkanMemoryAllocator/include/vk_mem_alloc.h
