@@ -89,15 +89,22 @@ def cleanControllerConfig(retroconfig: UnixSettings, controllers: Controllers, /
 def writeHotKeyConfig(retroconfig: UnixSettings, controllers: Controllers, /) -> None:
     if controllers and 'hotkey' in controllers[0].inputs and controllers[0].inputs['hotkey'].type == 'button':
         retroconfig.save('input_enable_hotkey_btn', controllers[0].inputs['hotkey'].id)
-    # Without this, input_enable_hotkey_btn alone arms the hotkey modifier
-    # but no joypad action is bound to it, so Hotkey+Start (the batocera
-    # keyboard convention for force-quitting a game, see es_input.cfg's
-    # keyboard hotkey=select binding) does nothing on a gamepad - only the
-    # keyboard input_exit_emulator="escape" above ever quits a running
-    # libretro core. Confirmed live on hardware (ODROID-M1, SHAKS S6b pad):
-    # Hotkey+Start did not exit FBNeo until this was added.
-    if controllers and 'start' in controllers[0].inputs and controllers[0].inputs['start'].type == 'button':
-        retroconfig.save('input_exit_emulator_btn', controllers[0].inputs['start'].id)
+        # Without this, input_enable_hotkey_btn alone arms the hotkey
+        # modifier but no joypad action is bound to it, so Hotkey+Start
+        # (the batocera keyboard convention for force-quitting a game, see
+        # es_input.cfg's keyboard hotkey=select binding) does nothing on a
+        # gamepad - only the keyboard input_exit_emulator="escape" above
+        # ever quits a running libretro core. Confirmed live on hardware
+        # (ODROID-M1, SHAKS S6b pad): Hotkey+Start did not exit FBNeo
+        # until this was added.
+        #
+        # Nested inside the hotkey check (not a second top-level if): if a
+        # pad has no hotkey button mapped, RetroArch treats a lone
+        # input_exit_emulator_btn as unmodified - Start alone would quit
+        # mid-game on every such pad, on every board, the moment
+        # controllers are configured at all.
+        if 'start' in controllers[0].inputs and controllers[0].inputs['start'].type == 'button':
+            retroconfig.save('input_exit_emulator_btn', controllers[0].inputs['start'].id)
 
 # Write a configuration for a specified controller
 def writeControllerConfig(
