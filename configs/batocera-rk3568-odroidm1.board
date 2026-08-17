@@ -12,14 +12,19 @@ BR2_PACKAGE_BATOCERA_TARGET_RK3568=y
 BR2_PACKAGE_BATOCERA_TARGET_BSP_ODROIDM1=y
 BR2_TARGET_OPTIMIZATION="-pipe -fsigned-char"
 BR2_TARGET_GENERIC_GETTY_BAUDRATE_115200=y
-# NOT rk3568/patches: its ffmpeg/mpv patches add v4l2-request HEVC support
-# that needs newer V4L2 UAPI structs only present in the shared target's
-# mainline 7.0.11 kernel headers, not our BSP fork. (An earlier version of
-# this comment claimed the shared target's uboot patches were relevant to
-# us too and copied them into bsp-odroidm1/patches/uboot/ - they weren't:
-# BR2_GLOBAL_PATCH_DIR only applies a <dir>/<pkg>/ patch to a package whose
-# name matches <pkg> exactly, and those were Anbernic RGxx3 fixes that
-# never once matched our uboot-odroid-m1 package. Removed.)
+# NOT rk3568/patches wholesale: most of its patches (uboot, etc.) target
+# other boards on that shared target (e.g. Anbernic RGxx3 fixes) and never
+# match anything here - BR2_GLOBAL_PATCH_DIR only applies a <dir>/<pkg>/
+# patch to a package whose name matches <pkg> exactly, so they'd just be
+# dead weight, not silently wrong. (An earlier version of this comment
+# claimed the shared target's uboot patches were relevant to us too and
+# copied them into bsp-odroidm1/patches/uboot/ - they weren't. Removed.)
+# The ffmpeg/mpv patches ARE genuinely useful here though, and 4 of the 5
+# are byte-identical copies kept manually in sync (see
+# bsp-odroidm1/patches/ffmpeg/patches-source.txt) - only
+# 0002-wip-hevc-Add-support-for-sps-st-rps-control.patch is excluded,
+# since it needs newer V4L2 UAPI structs only present in the shared
+# target's mainline 7.0.11 kernel headers, not our BSP fork.
 BR2_GLOBAL_PATCH_DIR="$(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/patches $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/patches $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/bsp-odroidm1/patches"
 BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/fsoverlay $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/fsoverlay $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/rk3568/fsoverlay $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/bsp-odroidm1/fsoverlay"
 
