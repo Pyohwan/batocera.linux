@@ -139,8 +139,7 @@
     <windowRule identifier="batocera-config-*" serverDecoration="yes" />
     <windowRule identifier="*.desktopconfig" serverDecoration="yes" />
     <windowRule identifier="duckstation-qt" serverDecoration="yes" />
-    <windowRule identifier="pcsx2-qt" serverDecoration="yes" />
-    <windowRule identifier="pcsx2-qt">
+    <windowRule identifier="pcsx2-qt" serverDecoration="yes">
       <action name="ToggleFullscreen" />
       <action name="Focus" />
     </windowRule>
