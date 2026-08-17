@@ -9,6 +9,13 @@ default:
     # boards get nothing unless they opt in too). On genuinely Mesa/gallium
     # boards this would draw a second overlay on top of mangohud or the
     # emulator's own fps counter, so it's opt-in rather than unconditional.
+# gamecube/nds/wii/fmtowns/psx/ps2/flash/model3/model2 below are copied
+# verbatim from the shared configgen-defaults-rk3568.yml - only one
+# arch-defaults file gets loaded per board, so there's no way to share
+# these without duplicating them. Kept manually in sync (same convention
+# as board/batocera/rockchip/bsp-odroidm1/patches/ffmpeg/patches-source.txt);
+# if the shared file's entries for these systems ever change, this file
+# needs the same edit or it silently falls behind.
 gamecube:
   emulator: libretro
   core:     dolphin
