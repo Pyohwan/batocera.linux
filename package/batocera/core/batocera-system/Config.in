@@ -803,7 +803,7 @@ endchoice
 # bootloader package flag, not a board identity, and using it as a "not this
 # board" proxy silently affects the other 10 boards on the shared target too.
 config BR2_PACKAGE_BATOCERA_TARGET_BSP_ODROIDM1
-	bool
+	bool "odroidm1 dedicated bsp target"
 	default n
 
 config BR2_PACKAGE_BATOCERA_EXTRAS
