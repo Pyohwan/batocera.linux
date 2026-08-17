@@ -24,9 +24,8 @@ UID  := $(shell id -u)
 GID  := $(shell id -g)
 
 # Opt-in extra bind mount for iterative package development: point
-# KERNEL_SRCDIR (or any <NAME>_SRCDIR=<path> via EXTRA_SRCDIR_MOUNTS, see
-# below) at a local git checkout and it shows up in the container at
-# /kernel-src, ready for a <PKG>_OVERRIDE_SRCDIR=/kernel-src in local.mk
+# KERNEL_SRCDIR at a local git checkout and it shows up in the container
+# at /kernel-src, ready for a <PKG>_OVERRIDE_SRCDIR=/kernel-src in local.mk
 # (see output/<board>/local.mk - BR2_PACKAGE_OVERRIDE_FILE's default
 # location). This is buildroot's own documented mechanism for "edit
 # source, rebuild, no commit/push needed" - see buildroot manual's "Using
