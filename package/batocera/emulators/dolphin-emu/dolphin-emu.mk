@@ -61,11 +61,18 @@ DOLPHIN_EMU_CONF_OPTS += -DUSE_SYSTEM_FMT=OFF
 DOLPHIN_EMU_CONF_OPTS += -DENABLE_CLI_TOOL=OFF
 DOLPHIN_EMU_CONF_OPTS += -DUSE_RETRO_ACHIEVEMENTS=ON
 
-ifeq ($(BR2_PACKAGE_BATOCERA_WAYLAND),y)
+ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_BSP_ODROIDM1),y)
 # The Wayland patch series only wires native Wayland support into
 # DolphinNoGUI's Platform abstraction, not into the Qt GUI's window widget
-# (confirmed: patch touches zero Qt source files) - so Wayland boards must
-# use the NoGUI/dolphin-emu-nogui binary regardless of Qt6 availability.
+# (confirmed: patch touches zero Qt source files) - so this board must use
+# the NoGUI/dolphin-emu-nogui binary regardless of Qt6 availability.
+#
+# Gated on this board specifically, not generic BR2_PACKAGE_BATOCERA_WAYLAND:
+# other Wayland boards now build the newer stock commit (see the
+# DOLPHIN_EMU_VERSION swap above), which never gets the Wayland patch
+# series in the first place - the "must use NoGUI" reasoning below doesn't
+# apply to them, and forcing it anyway silently took away their Qt GUI
+# for no reason (2nd review round, PR #4).
 DOLPHIN_EMU_CONF_OPTS += -DENABLE_QT=OFF
 DOLPHIN_EMU_CONF_OPTS += -DENABLE_NOGUI=ON
 DOLPHIN_EMU_CONF_OPTS += -DENABLE_WAYLAND=ON
