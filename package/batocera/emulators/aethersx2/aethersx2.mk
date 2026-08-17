@@ -15,9 +15,14 @@
 # minutes of actual gameplay with zero GPU faults where bmdhacks/pcsx2
 # reliably faults within ~100s. This package exists purely to make that
 # already-proven-working binary launchable from ES.
+# Pinned to a specific commit rather than the branch HEAD, same as the
+# mali-g52-odroidm1 blob below - "main" is a moving target, and this is a
+# third-party prebuilt binary with no upstream release/tag to pin to
+# instead, so a hash check (aethersx2.hash) matters even more here than
+# for source packages we actually compile ourselves.
 AETHERSX2_VERSION = 1.5-3606
 AETHERSX2_SOURCE = aethersx2.tar.gz
-AETHERSX2_SITE = https://github.com/ROCKNIX/packages/raw/refs/heads/main
+AETHERSX2_SITE = https://github.com/ROCKNIX/packages/raw/0b61d2a472751b127b1806207d9c459c7d6e334d
 AETHERSX2_LICENSE = LGPL
 AETHERSX2_EMULATOR_INFO = aethersx2.emulator.yml
 
