@@ -1089,7 +1089,26 @@ case "$COMMAND" in
         D=$(basename "$dev")
         [ "$D" != "$(get_parent_disk $D)" ] && continue
         ID=$(get_unique_id "$D")
+        MATCH=false
         if [[ "$ID" == "$UNIQUE_ID" ]] || [[ "${ID%:*}" == "$UNIQUE_ID" ]]; then
+            # Legacy disk-scoped ignore.drives entry (pre-partition-scoped).
+            MATCH=true
+        else
+            # UNIQUE_ID is partition-scoped (get_partition_unique_id), not
+            # disk-scoped - check every partition on this disk instead of
+            # just the disk's own id, otherwise a partition-level ignore
+            # never matches here and this whole re-detection loop is a
+            # silent no-op (the ignore.drives write above still succeeds,
+            # so it only takes effect on the next boot's initial scan).
+            for part in /sys/class/block/$D/$D*; do
+                [ -e "$part" ] || continue
+                P=$(basename "$part")
+                [ "$P" == "$D" ] && continue
+                PID=$(get_partition_unique_id "$P")
+                [ "$PID" == "$UNIQUE_ID" ] && { MATCH=true; break; }
+            done
+        fi
+        if [ "$MATCH" = true ]; then
              rm -f "/tmp/storage.pending.$D"
              $0 detect "$D" &
              # Trigger detection for every partition on this disk
