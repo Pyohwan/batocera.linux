@@ -19,8 +19,7 @@ DOSBOX_X_CONF_OPTS = --host="$(GNU_TARGET_NAME)" \
                      --disable-avcodec \
                      --disable-sdl \
                      --enable-sdl2 \
-                     --with-sdl2-prefix="$(STAGING_DIR)/usr" \
-                     --disable-avcodec
+                     --with-sdl2-prefix="$(STAGING_DIR)/usr"
 
 define DOSBOX_X_CONFIGURE_CONFIG
     mkdir -p $(TARGET_DIR)/usr/share/batocera/datainit/system/configs/dosbox
