@@ -208,17 +208,16 @@ def start_rom(args: argparse.Namespace, maxnbplayers: int, rom: Path, original_r
                                 cmd.array.insert(0, "mangohud")
 
                     # Mesa's own on-screen graph (fps/frametime) via the gallium
-                    # driver, set unconditionally alongside whatever each
-                    # generator's own show_fps wiring already does (native
-                    # counters, e.g. retroarch's fps_show or dolphin's
-                    # ShowFPS - left untouched, one central env var here beats
-                    # touching every generator individually). Harmless no-op
-                    # on processes that never load a gallium driver (any
-                    # non-GL system, or the vendor Mali blob) or on older
-                    # Mesa without HUD support - the process just never draws
-                    # it, so this is naturally a fallback to each generator's
-                    # existing fps display instead of an either/or choice.
-                    if system.config.show_fps:
+                    # driver, for boards where mangohud can't be used (its EGL
+                    # hook crashes on some vendor blobs) - see the
+                    # gallium_hud_fallback default in each board's
+                    # configgen-defaults-<arch>.yml. Opt-in, not unconditional:
+                    # on a genuinely Mesa/gallium board this draws a second
+                    # overlay on top of mangohud or the generator's own fps
+                    # counter (e.g. retroarch's fps_show, dolphin's ShowFPS),
+                    # so it's only meant as a fallback for boards that can't
+                    # use those.
+                    if system.config.show_fps and system.config.get_bool('gallium_hud_fallback'):
                         cmd.env["GALLIUM_HUD"] = "fps"
 
                     # generate the gun help

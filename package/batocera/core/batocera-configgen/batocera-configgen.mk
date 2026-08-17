@@ -56,6 +56,12 @@ else ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_A3GEN2),y)
 	BATOCERA_CONFIGGEN_SYSTEM=a3gen2
 else ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_RK3328),y)
 	BATOCERA_CONFIGGEN_SYSTEM=rk3328
+else ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_BSP_ODROIDM1),y)
+	# Own defaults file, not the shared rk3568 one below - the disabled
+	# hud_support entries there are Mali-blob-specific (mangohud's EGL
+	# hook crashes on it), not applicable to the other rk3568-family
+	# boards (mainline kernel + Panfrost).
+	BATOCERA_CONFIGGEN_SYSTEM=rk3568-odroidm1
 else ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_RK3568),y)
 	BATOCERA_CONFIGGEN_SYSTEM=rk3568
 else ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_RK3326),y)
