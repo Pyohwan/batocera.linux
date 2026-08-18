@@ -1,6 +1,6 @@
 --- a/src/video/SDL_egl.c
 +++ b/src/video/SDL_egl.c
-@@ -37,6 +37,28 @@
+@@ -37,6 +37,54 @@
  #include "SDL_egl_c.h"
  #include "SDL_loadso.h"
  #include "SDL_hints.h"
@@ -26,18 +26,45 @@
 +            (long long)(ts_.tv_sec * 1000000LL + ts_.tv_nsec / 1000));
 +    return FT_real_eglSwapBuffers(dpy, surf);
 +}
++
++/* FRAMETIME_LOG is set on the *frontend* (emulationstation) process so that
++ * the game it forks/execs inherits it - but emulationstation itself also
++ * links this same libSDL2 and does its own swaps (still-live background
++ * redraws even with a game "in front"), so it would otherwise open and
++ * write into the same log file as the game it launched, corrupting it with
++ * interleaved/out-of-order timestamps from two independent processes
++ * (confirmed live: ES held an open FD on the game's FRAMETIME_LOG path,
++ * producing multi-hundred-second jumps in the CSV). Exclude the frontend
++ * itself by process name so only the actual emulator process logs. */
++static int FT_skip_self(void)
++{
++    static int cached = -1;
++    if (cached < 0) {
++        char comm[16] = {0};
++        FILE *cf = fopen("/proc/self/comm", "r");
++        if (cf) {
++            if (!fgets(comm, sizeof(comm), cf)) {
++                comm[0] = '\0';
++            }
++            fclose(cf);
++        }
++        cached = (SDL_strncmp(comm, "emulationstatio", 15) == 0);
++    }
++    return cached;
++}
  
  #ifdef EGL_KHR_create_context
  /* EGL_OPENGL_ES3_BIT_KHR was added in version 13 of the extension. */
-@@ -479,6 +501,21 @@
+@@ -479,6 +527,22 @@
          _this->egl_data = NULL;
          return -1;
      }
 +
 +    /* frametime logger: substitute logging wrapper if requested. Guarded by
 +     * a pointer-identity check so a second LoadLibraryOnly() call (video
-+     * reinit) doesn't double-wrap. */
-+    {
++     * reinit) doesn't double-wrap. Skipped entirely for the emulationstation
++     * frontend itself (see FT_skip_self() above). */
++    if (!FT_skip_self()) {
 +        const char *ft_path = SDL_getenv("FRAMETIME_LOG");
 +        if (ft_path && !FT_log) {
 +            FT_log = fopen(ft_path, "w");
