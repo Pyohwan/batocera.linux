@@ -122,6 +122,13 @@ BR2_PACKAGE_LIBRETRO_DOLPHIN=y
 # libretro-fbneo-korean/.
 BR2_PACKAGE_LIBRETRO_FBNEO_KOREAN=y
 
+# batocera-system/Config.in's default select list for beetle-saturn only
+# covers a fixed board whitelist (x86/rk3588/qcs6490/sm8xxx/...) that
+# doesn't include our RK3568 family, so force it on directly - alternate
+# Saturn core for comparison against yabasanshiro (mednafen-accuracy
+# tradeoff, known slow on this CPU from earlier live testing).
+BR2_PACKAGE_LIBRETRO_BEETLE_SATURN=y
+
 # Saturn: tried enabling kronos here (upstream only selects it for x86,
 # but its .mk already supports several ARM+GLES boards via FORCE_GLES=1 -
 # added an RK3568 branch reusing the odroid-c4 GLES platform, see
