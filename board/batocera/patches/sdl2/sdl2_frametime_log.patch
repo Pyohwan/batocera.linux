@@ -1,0 +1,53 @@
+--- a/src/video/SDL_egl.c
++++ b/src/video/SDL_egl.c
+@@ -37,6 +37,28 @@
+ #include "SDL_egl_c.h"
+ #include "SDL_loadso.h"
+ #include "SDL_hints.h"
++#include <stdio.h>
++#include <time.h>
++
++/* frametime logger (env FRAMETIME_LOG). Wraps the eglSwapBuffers function
++ * pointer itself instead of the generic SDL_EGL_SwapBuffers() helper: on
++ * this board (and any Wayland/KMSDRM backend), the per-backend SwapWindow
++ * implementations (Wayland_GLES_SwapWindow, KMSDRM_GLES_SwapWindow) call
++ * _this->egl_data->eglSwapBuffers() directly and never go through
++ * SDL_EGL_SwapBuffers() - a hook there is dead code for those backends.
++ * The function pointer is the true single choke point for every backend
++ * (SDL_EGL_SwapBuffers() itself also calls through this same pointer, so
++ * wrapping it here covers that path too without double-counting). */
++static EGLBoolean (EGLAPIENTRY *FT_real_eglSwapBuffers)(EGLDisplay, EGLSurface);
++static FILE *FT_log;
++static EGLBoolean EGLAPIENTRY FT_log_eglSwapBuffers(EGLDisplay dpy, EGLSurface surf)
++{
++    struct timespec ts_;
++    clock_gettime(CLOCK_MONOTONIC, &ts_);
++    fprintf(FT_log, "%lld\n",
++            (long long)(ts_.tv_sec * 1000000LL + ts_.tv_nsec / 1000));
++    return FT_real_eglSwapBuffers(dpy, surf);
++}
+ 
+ #ifdef EGL_KHR_create_context
+ /* EGL_OPENGL_ES3_BIT_KHR was added in version 13 of the extension. */
+@@ -479,6 +501,21 @@
+         _this->egl_data = NULL;
+         return -1;
+     }
++
++    /* frametime logger: substitute logging wrapper if requested. Guarded by
++     * a pointer-identity check so a second LoadLibraryOnly() call (video
++     * reinit) doesn't double-wrap. */
++    {
++        const char *ft_path = SDL_getenv("FRAMETIME_LOG");
++        if (ft_path && !FT_log) {
++            FT_log = fopen(ft_path, "w");
++            if (FT_log) setvbuf(FT_log, NULL, _IOLBF, 0);
++        }
++        if (FT_log && _this->egl_data->eglSwapBuffers != FT_log_eglSwapBuffers) {
++            FT_real_eglSwapBuffers = _this->egl_data->eglSwapBuffers;
++            _this->egl_data->eglSwapBuffers = FT_log_eglSwapBuffers;
++        }
++    }
+     return 0;
+ }
+ 
