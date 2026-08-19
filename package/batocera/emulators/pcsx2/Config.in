@@ -31,8 +31,13 @@ config BR2_PACKAGE_PCSX2
     select BR2_PACKAGE_RAPIDYAML
     select BR2_PACKAGE_SDL3  
     select BR2_PACKAGE_SHADERC  
-    select BR2_PACKAGE_VULKAN_HEADERS    if BR2_PACKAGE_BATOCERA_VULKAN  
-    select BR2_PACKAGE_VULKAN_LOADER     if BR2_PACKAGE_BATOCERA_VULKAN  
+    select BR2_PACKAGE_VULKAN_HEADERS    if BR2_PACKAGE_BATOCERA_VULKAN
+    select BR2_PACKAGE_VULKAN_LOADER     if BR2_PACKAGE_BATOCERA_VULKAN
+    # Header-only package (protocol headers, no runtime X11 dependency) -
+    # was previously guaranteed enabled transitively via XORG7, which this
+    # board no longer depends on above. select it directly instead of
+    # relying on that chain.
+    select BR2_PACKAGE_XORGPROTO
     select BR2_PACKAGE_WEBP
     select BR2_PACKAGE_WXWIDGETS         if BR2_PACKAGE_HAS_LIBGL
     select BR2_PACKAGE_YAML_CPP
