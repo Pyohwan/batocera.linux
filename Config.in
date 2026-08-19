@@ -56,6 +56,12 @@ menu "System"
     source "$BR2_EXTERNAL_BATOCERA_PATH/package/batocera/boot/uboot-rk3326/Config.in"
     source "$BR2_EXTERNAL_BATOCERA_PATH/package/batocera/boot/rocknix-abl/Config.in"
     source "$BR2_EXTERNAL_BATOCERA_PATH/package/batocera/boot/uboot-odroid-m2/Config.in"
+    # Pre-dates upstream's "rework uboot for rk356x devices" (01273a1f5f),
+    # which deleted uboot-odroid-m1 in favor of the unified uboot-rk356x
+    # below. Our board still uses this standalone package (known-working,
+    # matches this board's actual VU8M/SPI boot flow) - migrating to
+    # uboot-rk356x is a separate, deliberate follow-up, not a merge fix.
+    source "$BR2_EXTERNAL_BATOCERA_PATH/package/batocera/boot/uboot-odroid-m1/Config.in"
     source "$BR2_EXTERNAL_BATOCERA_PATH/package/batocera/boot/uboot-rk356x/Config.in"
     source "$BR2_EXTERNAL_BATOCERA_PATH/package/batocera/boot/uboot-rk3576/Config.in"
     source "$BR2_EXTERNAL_BATOCERA_PATH/package/batocera/boot/uboot-gameforce-ace/Config.in"
@@ -92,6 +98,7 @@ menu "System"
     source "$BR2_EXTERNAL_BATOCERA_PATH/package/batocera/gpu/mesa-panfork/Config.in"
     source "$BR2_EXTERNAL_BATOCERA_PATH/package/batocera/gpu/mali-G610/Config.in"
     source "$BR2_EXTERNAL_BATOCERA_PATH/package/batocera/gpu/mali-G52/Config.in"
+    source "$BR2_EXTERNAL_BATOCERA_PATH/package/batocera/gpu/mali-g52-odroidm1/Config.in"
     source "$BR2_EXTERNAL_BATOCERA_PATH/package/batocera/gpu/mali-G31/Config.in"
     source "$BR2_EXTERNAL_BATOCERA_PATH/package/batocera/gpu/mali-g31-gbm/Config.in"
     source "$BR2_EXTERNAL_BATOCERA_PATH/package/batocera/gpu/mali-mp400-wayland/Config.in"
@@ -254,6 +261,7 @@ menu "Emulators"
       source "$BR2_EXTERNAL_BATOCERA_PATH/package/batocera/emulators/retroarch/libretro/libretro-gp32emu/Config.in"
       source "$BR2_EXTERNAL_BATOCERA_PATH/package/batocera/emulators/retroarch/libretro/libretro-fbalpha/Config.in"
       source "$BR2_EXTERNAL_BATOCERA_PATH/package/batocera/emulators/retroarch/libretro/libretro-fbneo/Config.in"
+      source "$BR2_EXTERNAL_BATOCERA_PATH/package/batocera/emulators/retroarch/libretro/libretro-fbneo-korean/Config.in"
       source "$BR2_EXTERNAL_BATOCERA_PATH/package/batocera/emulators/retroarch/libretro/libretro-gw/Config.in"
       source "$BR2_EXTERNAL_BATOCERA_PATH/package/batocera/emulators/retroarch/libretro/libretro-prboom/Config.in"
       source "$BR2_EXTERNAL_BATOCERA_PATH/package/batocera/emulators/retroarch/libretro/libretro-mrboom/Config.in"
