@@ -174,6 +174,26 @@ get_unique_id() {
     fi
 }
 
+# Partition-scoped counterpart to get_unique_id (which is disk-scoped by
+# design - it works off the parent disk's serial/WWN, since that's what's
+# needed to recognize "this is the same physical drive" across boots
+# regardless of which port it's plugged into). REQUEST_MERGE/"ignore
+# forever" need a per-*partition* id instead: a drive with several
+# partitions (e.g. leftover OS installs alongside the real ROMs partition)
+# must let the user permanently ignore the junk ones without that also
+# blocking the real ROMs partition on the same disk.
+# Ported from Track A (odroid-m1-bsp-kernel@731d0772d9).
+get_partition_unique_id() {
+    local dev_path="/dev/$1"
+    local id=$(blkid -s UUID -o value "$dev_path")
+    [ -n "$id" ] && { echo "$id"; return; }
+    id=$(blkid -s PARTUUID -o value "$dev_path")
+    [ -n "$id" ] && { echo "$id"; return; }
+    # No filesystem/partition UUID at all (e.g. unformatted) - fall back to
+    # the devname, same last resort as get_unique_id.
+    echo "$1"
+}
+
 mount_partition() {
     local PART_DEV=$1
     local IGNORE_AUTOMATION=$2
@@ -240,15 +260,21 @@ mount_partition() {
     # Check Content & Merge
     if [ -d "$MOUNT_POINT/roms" ]; then
         log_msg "VALID: [$PART_DEV] /roms found at $MOUNT_POINT"
-        
-        if [ "$IGNORE_AUTOMATION" = true ]; then
-            log_msg "INFO: [$PART_DEV] Drive ignored. Staying mounted at $MOUNT_POINT but skipping pool."
-            return 0
-        fi
-        
+
         local BRANCH_PATH="$MOUNT_POINT/roms"
         local CURRENT_CONFIG=$(batocera-settings-get -f "$BOOT_CONF_FILE" "$CONFIG_KEY")
 
+        # A partition already explicitly merged into the pool must keep
+        # re-applying on every boot regardless of a disk-wide ignore flag.
+        # ignore.drives is disk-scoped (get_unique_id works off the parent
+        # disk, not the partition), so a drive with several partitions -
+        # e.g. leftover OS installs alongside the real ROMs partition -
+        # ends up with the *whole disk* ignored once the user dismisses the
+        # junk ones, silently blocking the already-configured ROMs
+        # partition's merge on every subsequent boot too. Checking
+        # "already configured" before the ignore check preserves the
+        # ignore for anything the user hasn't explicitly opted into yet.
+        # Ported from Track A (odroid-m1-bsp-kernel@731d0772d9).
         if [[ "$CURRENT_CONFIG" == *"$BRANCH_PATH"* ]]; then
             local CLEAN_BRANCH="${BRANCH_PATH#/}"
             if mount | grep " $POOL_PATH " | grep -q "$CLEAN_BRANCH"; then
@@ -265,22 +291,31 @@ mount_partition() {
                 touch "/tmp/mergerfs.pending"
             fi
             return 2
-        else
-            [ -n "$PENDING_FLAG_PATH" ] && touch "$PENDING_FLAG_PATH"
-            # Gather data for the GUI prompt
-            local PART_NAME=$(basename "$PART_DEV")
-            local PARENT=$(get_parent_disk "$PART_NAME")
-            local MODEL=$(lsblk -d -n -o MODEL "/dev/$PARENT")
-            local SIZE=$(lsblk -d -n -o SIZE "$PART_DEV")
-            # Clean variables
-            local MODEL_CLEAN=$(echo "$MODEL" | tr ':' '_' | xargs)
-            local SIZE_CLEAN=$(echo "$SIZE" | tr ':' '_')
-            [ -z "$MODEL_CLEAN" ] && MODEL_CLEAN="Generic Drive"
-
-            local UNIQUE_ID=$(get_unique_id "$PARENT")
-            send_notification "REQUEST_MERGE:$PART_NAME:$MODEL_CLEAN:$SIZE_CLEAN:$MOUNT_POINT:$UNIQUE_ID"
-            return 2
         fi
+
+        if [ "$IGNORE_AUTOMATION" = true ]; then
+            log_msg "INFO: [$PART_DEV] Drive ignored. Staying mounted at $MOUNT_POINT but skipping pool."
+            return 0
+        fi
+
+        [ -n "$PENDING_FLAG_PATH" ] && touch "$PENDING_FLAG_PATH"
+        # Gather data for the GUI prompt
+        local PART_NAME=$(basename "$PART_DEV")
+        local PARENT=$(get_parent_disk "$PART_NAME")
+        local MODEL=$(lsblk -d -n -o MODEL "/dev/$PARENT")
+        local SIZE=$(lsblk -d -n -o SIZE "$PART_DEV")
+        # Clean variables
+        local MODEL_CLEAN=$(echo "$MODEL" | tr ':' '_' | xargs)
+        local SIZE_CLEAN=$(echo "$SIZE" | tr ':' '_')
+        [ -z "$MODEL_CLEAN" ] && MODEL_CLEAN="Generic Drive"
+
+        # Partition-scoped, not disk-scoped (get_unique_id) - "ignore
+        # forever" on this notification's id must only ever ignore this one
+        # partition, not every other partition sharing the same physical
+        # disk (see get_partition_unique_id).
+        local UNIQUE_ID=$(get_partition_unique_id "$PART_NAME")
+        send_notification "REQUEST_MERGE:$PART_NAME:$MODEL_CLEAN:$SIZE_CLEAN:$MOUNT_POINT:$UNIQUE_ID"
+        return 2
     fi
     return 0
 }
@@ -558,11 +593,23 @@ case "$COMMAND" in
     # Check Ignore List (Disables Automation only)
     IGNORE_AUTOMATION=false
     UNIQUE_ID=$(get_unique_id "$PARENT_DISK")
-    CLEAN_ID=${UNIQUE_ID%:*} 
-    
-    if [ -n "$UNIQUE_ID" ] && [ -f "$BOOT_CONF_FILE" ]; then
+    CLEAN_ID=${UNIQUE_ID%:*}
+
+    # Partition-level id for this specific partition (empty for whole-disk
+    # events, i.e. DEVNAME == PARENT_DISK) - "ignore forever" is recorded
+    # per-partition (see get_partition_unique_id/mount_partition), so this
+    # must be checked independently of the disk-level id: a sibling
+    # partition being ignored must not disable automation here.
+    # Ported from Track A (odroid-m1-bsp-kernel@731d0772d9).
+    PART_UNIQUE_ID=""
+    [ "$DEVNAME" != "$PARENT_DISK" ] && PART_UNIQUE_ID=$(get_partition_unique_id "$DEVNAME")
+
+    if [ -f "$BOOT_CONF_FILE" ]; then
         IGNORED_LIST=$(batocera-settings-get -f "$BOOT_CONF_FILE" "ignore.drives")
-        if [[ " $IGNORED_LIST " == *" $UNIQUE_ID "* ]] || [[ " $IGNORED_LIST " == *" $CLEAN_ID "* ]]; then
+        if [ -n "$PART_UNIQUE_ID" ] && [[ " $IGNORED_LIST " == *" $PART_UNIQUE_ID "* ]]; then
+            log_msg "INFO: [$DEVNAME] Partition (ID: $PART_UNIQUE_ID) is in boot config ignore list. Automation disabled."
+            IGNORE_AUTOMATION=true
+        elif [ -n "$UNIQUE_ID" ] && ([[ " $IGNORED_LIST " == *" $UNIQUE_ID "* ]] || [[ " $IGNORED_LIST " == *" $CLEAN_ID "* ]]); then
             log_msg "INFO: [$DEVNAME] Disk '$PARENT_DISK' (ID: $UNIQUE_ID) is in boot config ignore list. Automation disabled."
             IGNORE_AUTOMATION=true
         fi
@@ -985,7 +1032,27 @@ case "$COMMAND" in
         D=$(basename "$dev")
         [ "$D" != "$(get_parent_disk $D)" ] && continue
         ID=$(get_unique_id "$D")
+        MATCH=false
         if [[ "$ID" == "$UNIQUE_ID" ]] || [[ "${ID%:*}" == "$UNIQUE_ID" ]]; then
+            # Legacy disk-scoped ignore.drives entry (pre-partition-scoped).
+            MATCH=true
+        else
+            # UNIQUE_ID is partition-scoped (get_partition_unique_id), not
+            # disk-scoped - check every partition on this disk instead of
+            # just the disk's own id, otherwise a partition-level ignore
+            # never matches here and this whole re-detection loop is a
+            # silent no-op (the ignore.drives write above still succeeds,
+            # so it only takes effect on the next boot's initial scan).
+            # Ported from Track A (odroid-m1-bsp-kernel@5a10ebc5b6).
+            for part in /sys/class/block/$D/$D*; do
+                [ -e "$part" ] || continue
+                P=$(basename "$part")
+                [ "$P" == "$D" ] && continue
+                PID=$(get_partition_unique_id "$P")
+                [ "$PID" == "$UNIQUE_ID" ] && { MATCH=true; break; }
+            done
+        fi
+        if [ "$MATCH" = true ]; then
              rm -f "/tmp/storage.pending.$D"
              $0 detect "$D" &            
              # Trigger detection for every partition on this disk
