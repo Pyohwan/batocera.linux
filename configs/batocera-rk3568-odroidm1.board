@@ -193,6 +193,15 @@ BR2_PACKAGE_VULKAN_WSI_LAYER=y
 # pulling in wxwidgets/libglu on this GLES-only board.
 BR2_PACKAGE_PCSX2=y
 
+# AetherSX2 (PS2) - vendored prebuilt aarch64 binary (ROCKNIX), uses the
+# older/pre-mainline GS renderer that survives on this blob (bmdhacks
+# pcsx2's newer GS trips DATA_INVALID_FAULT under load - see project
+# history for the cross-reproduction that pinned this down). This line
+# was missing entirely (package existed in the tree but was never
+# actually enabled here), so the ps2 system had no valid emulator and
+# was silently absent from ES's system list.
+BR2_PACKAGE_AETHERSX2=y
+
 # Dolphin standalone (GameCube/Wii) - distinct from libretro-dolphin above
 # (GL only). Has its own Vulkan gfxbackend option once g29p1 is in.
 BR2_PACKAGE_DOLPHIN_EMU=y

@@ -1,7 +1,16 @@
 config BR2_PACKAGE_PCSX2
     bool "pcsx2"
     depends on BR2_x86_64 || BR2_aarch64
-    depends on BR2_PACKAGE_XORG7
+    # BSP_ODROIDM1 excluded from the XORG7 requirement: this board is
+    # Wayland-only (no X11 anywhere in the stack), and PCSX2's Qt6 UI
+    # already runs here via the same Wayland/eglfs fallback pattern used
+    # by duckstation-qt/dolphin-emu/AetherSX2 on this board - confirmed
+    # building and running (GS thread hang + swapchain double-free/race
+    # bugs found and fixed independently of X11, see project history).
+    # Without this, an origin/master sync silently reintroduced this
+    # dependency and Kconfig's olddefconfig step drops the .board's
+    # forced BR2_PACKAGE_PCSX2=y since XORG7 isn't enabled on this board.
+    depends on BR2_PACKAGE_XORG7 || BR2_PACKAGE_BATOCERA_TARGET_BSP_ODROIDM1
     select BR2_PACKAGE_ALSA_LIB  
     select BR2_PACKAGE_BATOCERA_QT6  
     select BR2_PACKAGE_BR2_PACKAGE_FMT  
