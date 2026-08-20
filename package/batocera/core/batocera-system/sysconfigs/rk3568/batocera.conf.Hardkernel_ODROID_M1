@@ -40,14 +40,14 @@ system.cpu.governor=interactive
 # knob. See Joplin "ODROID-M1 retro OS 빌드 계획" for the underlying
 # measurements if per-system defaults are ever wanted again.
 #
-# global.powermode itself, however, was never actually set here - every
-# A/B track fps measurement so far ran under whatever batocera-power-mode
-# falls back to when global.powermode is unset (`set_default`, EPP/governor
-# "default", not "performance"), not the highperformance path the above
-# measurements were based on. Setting it here changes only the factory
-# default; ES's Game Settings > Power Mode menu still overrides it live
-# same as before.
-global.powermode=highperformance
+# global.powermode itself is intentionally left unset here (reverted after
+# briefly trying a "highperformance" factory default) - ES's Game Settings
+# > Power Mode menu displayed "auto" (no user override saved) even while
+# that factory default was silently active underneath, which is misleading:
+# the menu should reflect what's actually applied, not hide a source-level
+# override the user never chose. Leaving it unset means "auto" in the menu
+# genuinely means auto (batocera-power-mode's set_default fallback), and
+# the user picks "High Performance" there explicitly if they want it.
 
 # Default core for the fbneo system: dsno/Zansword's Korean-patched
 # fork (package/batocera/emulators/retroarch/libretro/
