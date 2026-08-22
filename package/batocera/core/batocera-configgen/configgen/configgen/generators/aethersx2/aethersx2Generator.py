@@ -78,6 +78,11 @@ def configureINI(config_directory: Path, system: Emulator, playersControllers: C
 
     if not cfg.has_section("UI"):
         cfg.add_section("UI")
+    # Without this, AetherSX2's own settings-version check treats the ini as
+    # missing/wrong-version and shows a "Settings failed to load... reset to
+    # defaults?" prompt on every launch - same key pcsx2Generator.py already
+    # sets for the mainline pcsx2-qt build, just missing here.
+    cfg.set("UI", "SettingsVersion", "1")
     cfg.set("UI", "StartFullscreen", "true")
     cfg.set("UI", "ConfirmShutdown", "false")
     cfg.set("UI", "HideMouseCursor", "true")
