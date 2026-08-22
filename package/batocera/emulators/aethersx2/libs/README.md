@@ -37,6 +37,18 @@ this networking stack is actually exercised at runtime (aethersx2 has no
 network feature enabled in this build, same reasoning as `libpcap` above) -
 purely a NEEDED-pass satisfaction, not functional network support.
 
+**Follow-up, same session**: fixing the curl load surfaced a second, same-class
+mismatch one layer deeper - this board's own `libssl.so.3`/`libcrypto.so.3`
+don't export `ENGINE_init` (`undefined symbol: ENGINE_init, version
+OPENSSL_3.0.0`), a legacy OpenSSL 1.1-era API some 3.x builds keep and others
+(including this board's) drop. Unlike the curl-closure libs above, curl's
+TLS backend init genuinely does call into libssl/libcrypto at process
+startup (not just a NEEDED-pass formality), so vendored Debian's
+`libssl3t64` here too rather than leaving it as a dangling requirement -
+`readelf`/`nm` confirmed the Debian build exports `ENGINE_init`. No further
+NEEDED gap: `libssl.so.3`/`libcrypto.so.3` only pull in `libz.so.1`/
+`libzstd.so.1`, both already present.
+
 Debian package each file's soname maps to (standard Debian/glvnd/mesa/curl
 packaging, not independently re-verified against a specific snapshot -
 the sha256 below is the actual reproducibility anchor):
@@ -60,6 +72,8 @@ the sha256 below is the actual reproducibility anchor):
 | `libldap.so.2` | `52130bdf6f1abdd8b476193cfd532d8c9f3a6d57eeabe06e4edb65b1711be83c` | `libldap2` |
 | `liblber.so.2` | `87376cef9c124257cec7fc0b5eac1b4c8535f597c6ebae70ad9334385cfb14d3` | `libldap2` (bundled) |
 | `libsasl2.so.2` | `8bfeedd24d410b345ac39c26dfa9970609fe0ca6738a20fd6ac154a232aec152` | `libsasl2-2` |
+| `libssl.so.3` | `0cd0e03cfadce973b7ff323db550794f487f3a7bed3b7f43eb23336e7d466647` | `libssl3t64` (3.5.6-1~deb13u2) |
+| `libcrypto.so.3` | `d451f843462c144e74c4f11503d3cc894d775deb10d3cfc129fc3aa70cfe8dda` | `libssl3t64` (bundled) |
 
 All are `aarch64`, stripped, with a BuildID (`readelf -n` / `file <lib>`) if
 a byte-for-byte source match against a specific Debian snapshot is ever
