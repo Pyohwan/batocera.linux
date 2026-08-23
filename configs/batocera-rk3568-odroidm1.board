@@ -171,18 +171,12 @@ BR2_PACKAGE_LIBRETRO_MELONDS_DS=y
 # Vulkan-native ports/UI options, no conflicting Mesa driver.
 BR2_PACKAGE_BATOCERA_VULKAN=y
 #
-# Side effect discovered later (2026-08-23, v15 build): with vulkan-headers/
-# vulkan-loader now available, gst1-plugins-bad's own vulkan plugin option
-# defaults on too - but batocera's "add vulkan support" patch to that
-# package never added a host shader-compiler dependency, and meson's vulkan
-# plugin needs to run glslc/glslang on the BUILD machine (to compile
-# embedded SPIR-V shaders), which cross-compilation doesn't have. Fails
-# with "GStreamer Vulkan plugin required via options, but glslc or glslang
-# was not found". Unrelated to this board's own Vulkan work (AetherSX2/
-# pcsx2-qt/Dolphin/PPSSPP all use their own Vulkan paths, not this
-# GStreamer plugin) - disable it explicitly rather than build out a whole
-# host-shaderc package for a feature nothing on this image needs.
-# BR2_PACKAGE_GST1_PLUGINS_BAD_PLUGIN_VULKAN is not set
+# Side effect discovered later (2026-08-23, v15 build): this hard-selects
+# BR2_PACKAGE_GST1_PLUGINS_BAD_PLUGIN_VULKAN (batocera-system/Config.in) -
+# a `select`, so it can't be undone from a defconfig. That GST plugin needs
+# a host shader compiler we don't have; see the actual fix (gated on a
+# nonexistent BR2_PACKAGE_HOST_SHADERC) in buildroot/package/gstreamer1/
+# gst1-plugins-bad/gst1-plugins-bad.mk (our buildroot fork, not upstream).
 #
 # The g29p1 blob's Vulkan ICD only implements VK_KHR_display (bare DRM, no
 # compositor) among windowing-system surface extensions - confirmed live
