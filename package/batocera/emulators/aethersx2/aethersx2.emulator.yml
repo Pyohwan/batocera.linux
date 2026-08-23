@@ -16,7 +16,7 @@ cores:
         prompt: GRAPHICS API
         description: Choose which graphics API library to use. Vulkan is the only one confirmed working on this board's GPU driver - OpenGL/Auto will likely fail to start.
         choices:
-          Vulkan (Default): 14
+          Vulkan: 14
           OpenGL: 12
           Software: 13
       aethersx2_resolution:
@@ -24,7 +24,7 @@ cores:
         prompt: RENDERING RESOLUTION
         description: Enhancement. Increase the rendering resolution. Makes 3D objects clearer. Higher settings need more GPU power.
         choices:
-          Native (PS2)(Default): 1
+          Native (PS2): 1
           1.5x Native: 1.5
           2x Native (~720p): 2
           3x Native (~1080p): 3

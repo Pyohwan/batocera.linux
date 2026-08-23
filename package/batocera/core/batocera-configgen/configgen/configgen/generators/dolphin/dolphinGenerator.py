@@ -125,15 +125,15 @@ class DolphinGenerator(Generator):
         # Enable MMU
         dolphinSettings.set("Core", "MMU", str(system.config.get_bool("enable_mmu")))
 
-        # Backend - Default OpenGL
-        if system.config.get("gfxbackend") == "Vulkan":
+        # Backend - Default Vulkan (falls back to OpenGL if explicitly chosen or Vulkan unavailable)
+        if system.config.get("gfxbackend") == "OGL":
+            dolphinSettings.set("Core", "GFXBackend", "OGL")
+        else:
             dolphinSettings.set("Core", "GFXBackend", "Vulkan")
             # Check Vulkan
             if not vulkan.is_available():
                 _logger.debug("Vulkan driver is not available on the system. Using OpenGL instead.")
                 dolphinSettings.set("Core", "GFXBackend", "OGL")
-        else:
-            dolphinSettings.set("Core", "GFXBackend", "OGL")
 
         # Wiimote scanning
         dolphinSettings.set("Core", "WiimoteContinuousScanning", "True")
