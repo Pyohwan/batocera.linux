@@ -157,6 +157,27 @@ define DOLPHIN_EMU_FIX_VMA_HEADER
         $(@D)/Externals/VulkanMemoryAllocator/include/vk_mem_alloc.h
 endef
 DOLPHIN_EMU_PRE_CONFIGURE_HOOKS += DOLPHIN_EMU_FIX_VMA_HEADER
+
+# The Wayland patch series' PlatformWayland.cpp includes UICommon/X11Utils.h
+# for no real reason (zero X11Utils:: symbols used - confirmed via source
+# read) EXCEPT that its two GFX_SHOW_FPS toggle calls sloppily pass Xlib's
+# True/False macros (#define True 1 / #define False 0) instead of C++
+# true/false for an Info<bool> param - they happen to compile because the
+# macros expand to int literals that convert to bool. That header's own
+# #include <X11/Xlib.h> is unconditional (not gated on HAVE_X11), so with
+# ENABLE_X11=OFF above (no X11 dev headers in this board's sysroot) the
+# include fails outright. Fix is two parts: drop the vestigial include, and
+# replace the two True/False literals with true/false so nothing here
+# depends on Xlib.h at all.
+define DOLPHIN_EMU_FIX_WAYLAND_X11_INCLUDE
+    sed -i '/#include "UICommon\/X11Utils.h"/d' \
+        $(@D)/Source/Core/DolphinNoGUI/PlatformWayland.cpp
+    sed -i \
+        -e 's/Config::SetCurrent(Config::GFX_SHOW_FPS, True);/Config::SetCurrent(Config::GFX_SHOW_FPS, true);/' \
+        -e 's/Config::SetCurrent(Config::GFX_SHOW_FPS, False);/Config::SetCurrent(Config::GFX_SHOW_FPS, false);/' \
+        $(@D)/Source/Core/DolphinNoGUI/PlatformWayland.cpp
+endef
+DOLPHIN_EMU_PRE_CONFIGURE_HOOKS += DOLPHIN_EMU_FIX_WAYLAND_X11_INCLUDE
 endif
 
 define DOLPHIN_EMU_INI

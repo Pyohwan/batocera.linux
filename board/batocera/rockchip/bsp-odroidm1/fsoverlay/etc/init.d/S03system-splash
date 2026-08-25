@@ -1,0 +1,152 @@
+#!/bin/sh
+
+# This is the BATOCERA system splash service
+# It shows the unique BATOCERA logo in early boot stage
+
+LOG_FILE="/var/log/splash.log"
+
+do_start () {
+    LOG_DIR="${LOG_FILE%/*}"
+    [ -d "${LOG_DIR}" ] || mkdir -p "${LOG_DIR}"
+    exec >> "${LOG_FILE}" 2>&1
+    
+    if [ ! -e /dev/fb0 ]; then
+        i=0
+        while [ ! -e /dev/fb0 ] && [ $i -lt 50 ]; do
+            sleep 0.1
+            i=$((i + 1))
+        done
+        if [ ! -e /dev/fb0 ]; then
+            echo "Error: Framebuffer device /dev/fb0 not found."
+            exit 1
+        fi
+    fi
+    
+    # Default image
+    image="/usr/share/batocera/splash/boot-logo.png"
+    # Standard FBV options
+    FBV_OPTS="-f -e -i -y"   
+    # Variables for screen dimensions
+    WIDTH=""
+    HEIGHT=""
+
+    # Resolve video rotation first so we know how to crop the image
+    V_BOARD_MODEL=$(batocera-model)
+    video_rotation=""
+    BOOT_CONF="/boot/batocera-boot.conf"
+
+    if [ -f "${BOOT_CONF}" ]; then
+        specific_key=$(awk -F'=' '/^[[:space:]]*display\.rotate\./{print $1; exit}' "${BOOT_CONF}" | tr -d '[:space:]')
+        if [ -n "${specific_key}" ]; then
+            video_rotation=$(/usr/bin/batocera-settings-get -f "${BOOT_CONF}" "${specific_key}")
+        fi
+        [ -z "${video_rotation}" ] && \
+            video_rotation=$(/usr/bin/batocera-settings-get -f "${BOOT_CONF}" "display.rotate")
+    fi
+
+    if [ -z "${video_rotation}" ]; then
+        MODEL_CONF="/usr/share/batocera/sysconfigs/batocera.conf.${V_BOARD_MODEL}"
+        if [ -f "${MODEL_CONF}" ]; then
+            # Match the *currently active* connector's rotate key specifically
+            # (same detection S65values4boot already uses) - a board can have
+            # more than one display.rotate.<connector> line for different
+            # outputs (e.g. a small secondary panel that needs rotating while
+            # the primary doesn't), and grabbing "whichever one happens to be
+            # first in the file" applied a completely unrelated connector's
+            # rotation to the splash (confirmed live on the ODROID-M1: with
+            # only display.rotate.DSI-1 defined, an HDMI-only boot picked
+            # that 90-degree value up and rendered the boot logo sideways).
+            effectiveDrmOutput=$(for GPU in /dev/dri/card*; do batocera-drminfo "${GPU}" "current" 2>/dev/null | grep -oP '^[0-9]+\.[0-9]+:\K[^ ]+'; done | head -1)
+            rotation_line=""
+            if [ -n "${effectiveDrmOutput}" ]; then
+                rotation_line=$(grep -E "^display\.rotate\.${effectiveDrmOutput}=" "${MODEL_CONF}" | head -1)
+            fi
+            if [ -z "${rotation_line}" ]; then
+                # No connector-specific match (or none detected yet this
+                # early in boot) - fall back to a bare "display.rotate="
+                # default if the board sysconfig defines one.
+                rotation_line=$(grep -E '^display\.rotate=' "${MODEL_CONF}" | head -1)
+            fi
+            if [ -n "${rotation_line}" ]; then
+                video_rotation=$(echo "${rotation_line}" | cut -d'=' -f2)
+            fi
+        fi
+    fi
+
+    video_rotation=$(echo "${video_rotation}" | tr -d '[:space:]')
+    echo "Final Rotation Value: [${video_rotation}]"
+    
+    # Get the screen's physical dimensions
+    if [ -r /sys/class/graphics/fb0/modes ]; then
+        if read -r MODE_STR < /sys/class/graphics/fb0/modes; then
+            DIM_PART=${MODE_STR#*:}
+            WIDTH=${DIM_PART%%x*}
+            remaining=${DIM_PART#*x}
+            HEIGHT=${remaining%%[!0-9]*}
+        fi
+
+        if [ -n "${WIDTH}" ] && [ -n "${HEIGHT}" ]; then
+            echo "Resolution detected via modes: ${WIDTH}x${HEIGHT}"
+            
+            # Determine target size for cropping.
+            # If rotated 90 or 270 degrees (1 or 3), swap width and height.
+            if [ "${video_rotation}" = "1" ] || [ "${video_rotation}" = "3" ]; then
+                CROP_WIDTH="${HEIGHT}"
+                CROP_HEIGHT="${WIDTH}"
+            else
+                CROP_WIDTH="${WIDTH}"
+                CROP_HEIGHT="${HEIGHT}"
+            fi
+
+            # Automatically crops and centers the master logo to target aspect ratio
+            cropped_image="/tmp/boot-logo-cropped.bmp"
+            if [ -f "${image}" ]; then
+                echo "Pre-cropping logo to logical size ${CROP_WIDTH}x${CROP_HEIGHT} via FFmpeg..."
+                if ffmpeg -y -threads 1 -sws_flags fast_bilinear \
+                    -i "${image}" \
+                    -vf "scale=w=${CROP_WIDTH}:h=${CROP_HEIGHT}:force_original_aspect_ratio=increase,crop=${CROP_WIDTH}:${CROP_HEIGHT}" \
+                    "${cropped_image}" >/dev/null 2>&1 \
+                   && [ -f "${cropped_image}" ]; then
+                    image="${cropped_image}"
+                fi
+            fi
+        fi
+    fi
+
+    if ! [ -f "${image}" ]; then
+        echo "Error: Splash image not found at ${image}"
+        exit 1
+    fi
+
+    case "${video_rotation}" in
+        1|2|3)
+            FBV_OPTS="${FBV_OPTS} -o ${video_rotation}"
+            echo "Applying FBV rotation: -o ${video_rotation}"
+            ;;
+    esac
+
+    MODELOPTS="/etc/opts.${V_BOARD_MODEL}"
+    [ -e "${MODELOPTS}" ] && . "${MODELOPTS}"
+
+    echo "Executing Command: fbv ${FBV_OPTS} \"${image}\""
+    fbv ${FBV_OPTS} "${image}" >/dev/null 2>&1
+}
+
+do_stop () {
+    [ -e /dev/fb0 ] && dd if=/dev/zero of=/dev/fb0 >/dev/null 2>&1
+}
+
+case "$1" in
+    start)
+        do_start &
+        ;;
+    stop)
+        do_stop
+        ;;
+    *)
+        echo "Usage: $0 {start|stop}"
+        exit 1
+        ;;
+esac
+
+exit $?
