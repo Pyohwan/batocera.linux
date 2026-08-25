@@ -196,6 +196,15 @@ BATOCERA_EMULATIONSTATION_DEPENDENCIES += labwc
 BATOCERA_EMULATIONSTATION_POST_INSTALL_TARGET_HOOKS += BATOCERA_EMULATIONSTATION_WAYLAND_LABWC
 endif
 
+## odroid-m1: SHAKS S6b default gamepad mapping + keyboard hotkey==select,
+## appended onto whatever upstream's es_input.cfg currently is (not a full
+## fsoverlay replacement - this file is upstream's actively-maintained
+## controller DB, freezing the whole thing would silently drop every future
+## upstream controller mapping addition)
+ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_BSP_ODROIDM1),y)
+BATOCERA_EMULATIONSTATION_POST_INSTALL_TARGET_HOOKS += BATOCERA_EMULATIONSTATION_ODROIDM1_INPUT
+endif
+
 define BATOCERA_EMULATIONSTATION_XORG
 	$(INSTALL) -D -m 0755 $(BATOCERA_EMULATIONSTATION_PKGDIR)/xorg/xinitrc \
 	    $(BINARIES_DIR)/batocera-target/etc/X11/xinit/xinitrc
@@ -224,6 +233,11 @@ define BATOCERA_EMULATIONSTATION_WAYLAND_LABWC
 	    $(TARGET_DIR)/usr/share/labwc/
     $(INSTALL) -D -m 0755 $(BATOCERA_EMULATIONSTATION_PKGDIR)/wayland/labwc/labwc-launch \
 	    $(TARGET_DIR)/usr/bin/labwc-launch
+endef
+
+define BATOCERA_EMULATIONSTATION_ODROIDM1_INPUT
+	python3 $(BATOCERA_EMULATIONSTATION_PKGDIR)/controllers/odroidm1_patch_es_input.py \
+	    $(TARGET_DIR)/usr/share/emulationstation/es_input.cfg
 endef
 
 define BATOCERA_EMULATIONSTATION_BOOT
