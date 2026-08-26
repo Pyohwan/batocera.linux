@@ -12,6 +12,20 @@ BATOCERA_SYSTEM_DATE = $(shell date "+%Y/%m/%d")
 BATOCERA_SYSTEM_DEPENDENCIES = tzdata
 BATOCERA_SYSTEM_INSTALL_IMAGES = YES
 
+# odroid-m1: show our own release tag (batocera44-odroidm1-vX.Y.Z) instead
+# of upstream's plain "44-dev" when HEAD is exactly on one of our release
+# tags, otherwise fall back to a "-dev" marker in our own naming scheme.
+# Must still contain "dev" in the fallback case so BATOCERA_SYSTEM_COMMIT
+# below keeps appending a commit hash - that's what it greps for.
+ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_BSP_ODROIDM1),y)
+BATOCERA_SYSTEM_ODROIDM1_RELEASE_TAG := $(shell cd $(BR2_EXTERNAL_BATOCERA_PATH) && git describe --exact-match --tags --match 'batocera44-odroidm1-v*' 2>/dev/null)
+ifneq ($(BATOCERA_SYSTEM_ODROIDM1_RELEASE_TAG),)
+BATOCERA_SYSTEM_VERSION = $(BATOCERA_SYSTEM_ODROIDM1_RELEASE_TAG)
+else
+BATOCERA_SYSTEM_VERSION = batocera44-odroidm1-dev
+endif
+endif
+
 ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_BCM2837),y)
 	BATOCERA_SYSTEM_ARCH=bcm2837
 else ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_RK3399),y)
