@@ -16,14 +16,21 @@ default:
 # as board/batocera/rockchip/bsp-odroidm1/patches/ffmpeg/patches-source.txt);
 # if the shared file's entries for these systems ever change, this file
 # needs the same edit or it silently falls behind.
+# gamecube/wii diverge from the shared file on purpose: standalone dolphin
+# (emulator: dolphin) is what's actually benchmarked/recommended on this
+# board (libretro-dolphin's OpenGL path is the one that breaks under
+# Wayland - see project_odroid_retro.md), not the shared file's
+# libretro-dolphin default. dolphinGenerator.py already defaults to
+# Vulkan unless gfxbackend=OGL is explicitly set, so no extra option
+# needed here for that part.
 gamecube:
-  emulator: libretro
+  emulator: dolphin
   core:     dolphin
 nds:
   emulator: drastic
   core:     drastic
 wii:
-  emulator: libretro
+  emulator: dolphin
   core:     dolphin
 fmtowns:
   emulator: libretro
@@ -32,6 +39,18 @@ psx:
   options:
     hud_support: false # duckstation doesn't like it on n2+
 n64:
+  emulator: mupen64plus
+  core:     rice # standalone mupen64plus has no Vulkan renderer on this
+  # GPU class (GLES+Vulkan only, no desktop GL) - rice is the
+  # best-performing plugin benchmarked here (glide64mk2/gliden64 both
+  # slower). The shared configgen-defaults.yml default (glide64mk2) was
+  # never actually overridden by the "auto order" fix mentioned in
+  # project_odroid_retro.md - that fix reordered es_systems.yml's core
+  # listing, which has no effect on which core ES marks as "auto": that's
+  # driven by comparing against this emulator/core pair (see
+  # python-src/batocera-es-system's registry.py get_systems_metadata),
+  # not list order. Confirmed live: without this, auto silently ran
+  # glide64mk2 the whole time.
   options:
     hud_support: false # mupen64plus standalone + mangohud's EGL hooking:
     # the Mali blob doesn't implement the EGL extension function(s)
@@ -45,7 +64,16 @@ n64:
     # since other rk3568-family boards (mainline kernel + Panfrost) don't
     # have this vendor-blob-specific mangohud EGL hook failure.
 dreamcast:
+  emulator: flycast
+  core:     flycast # standalone flycast, not the shared file's
+  # libretro-flycast default - matches the benchmarked recommendation
+  # (all 4 combinations measured near-identical perf, but standalone
+  # avoids the extra libretro indirection). flycastGenerator.py's own
+  # renderer default is OpenGL (unlike dolphin/ppsspp, which both
+  # default to Vulkan already) - flycast_renderer=4 forces Vulkan
+  # (pvr.rend 4/5 in flycast's own config, see flycastGenerator.py).
   options:
+    flycast_renderer: "4"
     hud_support: false # same mangohud+Mali blob EGL crash as n64 above,
     # confirmed on standalone flycast (2026-08-07): SDL_CreateWindow fails
     # ("Can't load EGL/GL library on window creation") when mangohud wraps it.
