@@ -86,13 +86,19 @@ atomiswave:
 systemsp:
   options:
     hud_support: false # flycast core, same issue as dreamcast above
-# ps2 is the one entry that genuinely differs from the shared file (not just
-# a copy): AetherSX2/pcsx2 avoid the DATA_INVALID_FAULT GPU faults the
-# shared file's libretro-play default doesn't hit on this board's blob -
-# see project_odroid_retro.md / PR #4.
+# ps2 is the one entry that genuinely differs from the shared file (not
+# just a copy): the shared file's libretro-play default and pcsx2 both
+# hit a Mali blob GPU fault (DATA_INVALID_FAULT, confirmed live via
+# dmesg - "GPU fault 0x5b from job slot 0" - the game visibly hangs) that
+# AetherSX2 avoids (older GS command pattern doesn't trigger it) - see
+# project_odroid_retro.md's "Mali G52 blob 구조적 한계" section. pcsx2 is
+# kept installed/selectable in ES as a fallback for games/scenarios where
+# it happens not to fault, but must never be the auto default - it was,
+# until this fix (2026-08-28, caught live: auto silently launched pcsx2,
+# which promptly hung on a real GPU fault).
 ps2:
-  emulator: pcsx2
-  core:     pcsx2
+  emulator: aethersx2
+  core:     aethersx2
 flash:
   emulator: lightspark
   core:     lightspark
