@@ -8,7 +8,7 @@
 - 벤더 Mali G52 blob(g29p1 세대)을 씀 — GLES + Vulkan
 - Wayland(labwc) 컴포지터 지원 — PCSX2/Dolphin/AetherSX2 등 standalone Qt 기반 에뮬레이터 실사용 가능
 - 모노 스피커 볼륨/출력 라우팅 수정(기본 볼륨이 너무 작던 문제 해결)
-- FBNeo 한국어 패치 코어(`fbneo_korean`)를 기본값으로 씀 — dsno(Zansword)님의 한글 패치를 넣은 것
+- FBNeo 한국어 패치 코어(`fbneo_korean`)를 기본값으로 씀 — DsNo님이 만든, 한국어 번역 롬을 CRC32 불일치로 거부하던 문제를 고친 CRC 허용 패치를 넣은 것
 - AetherSX2(PS2)를 기본값으로 넣음 — mainline PCSX2 계열이 겪는 Mali GPU 폴트를 피하는 대안 코어
 - PS2/GameCube/Dreamcast/PSP 등 주요 시스템 Vulkan 렌더링 지원
 - 시스템별 자동(auto) 코어/API 선택을 실측 최고 성능 기준으로 다시 맞춤
