@@ -60,7 +60,7 @@ Measured on **`batocera44-odroidm1-v1.0.0`** (this doc always tracks the latest 
 | Genesis/Mega Drive | Altered Beast | **genesisplusgx** | — | **60.0** | 50.3 |
 | | | genesisplusgx-expanded | — | 60.0 | 47.6 |
 | | | picodrive | — | 60.0 | 48.5 |
-| FBNeo | 야구격투 리그맨 | **fbneo_korean** | — | **60.0** | 41.0 |
+| FBNeo | Ninja Baseball Bat Man | **fbneo_korean** | — | **60.0** | 41.0 |
 | Saturn | Strikers 1945 | **yabasanshiro** | GLES | **59.3** | 24.3 |
 | | | beetle-saturn | GLES | 22.5 | 16.8 |
 | | | beetle-saturn | Vulkan | 22.8 | 16.4 |
