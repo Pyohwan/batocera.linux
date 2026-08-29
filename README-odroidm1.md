@@ -15,41 +15,31 @@
 
 ## 설정
 
-### 부팅 파티션 파일 수정 방법
-
-아래에 나오는 `config.ini`/`batocera-boot.conf` 둘 다 부팅 파티션 최상위에 있는 파일이고, 이 파티션은 SD카드를 컴퓨터에 꽂으면 **"BATOCERA"**라는 이름의 일반 드라이브로 바로 보임 — 텍스트 에디터로 직접 열어서 고치면 됨. SSH로 켜져있는 상태에서 고치려면:
-```
-mount -o remount,rw /boot
-vi /boot/<파일명>
-reboot
-```
-
 ### 디스플레이 (HDMI / VU8M)
 
 - **HDMI**: 기본 활성화, 별도 설정 불필요(1080p까지 테스트 완료).
-- **VU8M**: 기본 비활성화. `config.ini`에서 켤 것:
+- **VU8M**: 기본 비활성화. **BATOCERA** 파티션(SD카드를 컴퓨터에 꽂으면 보이는 드라이브)의 `config.ini`에서 켤 것:
   ```
   overlays="display_vu8m"
   ```
-  끄려면 다시 `overlays=""`.
+  끄려면 다시 `overlays=""`. DSI 패널은 핫플러그 감지가 안 되므로, 켜두면 실제로 패널이 꽂혀있지 않아도 항상 "연결됨"으로 잡힘 — 안 쓸 땐 꺼둘 것.
 
-**둘을 동시에 켜두는 걸 권장 안 하는 이유**: 하드웨어적으로 배타적인 건 아님 — HDMI는 상시 켜져있는 고정 노드고 VU8M은 오버레이로 별개로 켜고 끄는 거라, 이론상 둘 다 동시에 켤 수 있음. 문제는 **DSI 패널엔 핫플러그 감지가 없어서** 오버레이를 켜두면 실제로 패널이 물리적으로 꽂혀있든 아니든 "연결됨"으로 잡힌다는 것 — 여기에 HDMI까지 연결돼있으면 커넥터가 두 개로 보여서, ES가 뜨기 전 단계인 부팅 스플래시가 어느 쪽 기준으로 그려야 할지 결정을 못 해서 회전이 잘못될 수 있음(ES 자체는 `global.videooutput` 설정으로 HDMI를 올바르게 골라 씀). **그래서 평소엔 필요한 쪽 하나만 켜두는 걸 권장.**
-
-**예외 — NDS 듀얼스크린**: NDS는 원래 화면이 위/아래 두 개라, HDMI+VU8M을 동시에 켜고 `melonDS` 코어를 쓰면 실제 물리 화면 두 개에 NDS의 위/아래 화면을 각각 나눠 출력할 수 있음(위 회전 이슈는 감수). 다만 melonDS는 이 보드에서 성능이 안 좋아서(GPU가속 켜도 기본 권장 코어 drastic 대비 훨씬 느림) **사실상 실사용은 힘듦** — 듀얼스크린이 정말 꼭 필요한 경우가 아니면 기본값인 drastic(단일 화면)을 쓸 것.
+**예외 — NDS 듀얼스크린**: NDS는 원래 화면이 위/아래 두 개라, HDMI+VU8M을 동시에 켜고 `melonDS` 코어를 쓰면 실제 물리 화면 두 개에 NDS의 위/아래 화면을 각각 나눠 출력할 수 있음. 다만 melonDS는 이 보드에서 성능이 안 좋아서(GPU가속 켜도 기본 권장 코어 drastic 대비 훨씬 느림) **사실상 실사용은 힘듦** — 듀얼스크린이 정말 꼭 필요한 경우가 아니면 기본값인 drastic(단일 화면)을 쓸 것.
 
 **VU8M을 보조 화면(백글래스/정보화면)으로 쓰기**: ES 메뉴의 **MULTISCREENS → BACKGLASS / INFORMATION SCREEN**에서 두 번째 비디오 출력 장치로 VU8M을 지정하면 됨(`global.videooutput2=DSI-1`) — 메인 화면(HDMI)에서 게임을 하는 동안 VU8M엔 박스아트/게임 정보 같은 백글래스 화면을 띄우는 용도. **이 값을 지정해야만** ES가 해당 출력을 실제로 구성(해상도/회전 적용)함 — 비워두면 그냥 HDMI 옆에 이어붙는 미사용 확장 화면으로만 잡히고 아무 것도 제대로 안 나옴.
 
-### 화면 회전
+### 화면 회전값 설정
 
-회전은 ES 메뉴(위 MULTISCREENS 섹션)에서 설정하는 게 정석 — 여기서 고른 값이 `batocera.conf`(userdata, 재부팅해도 유지됨)에 저장됨. 직접 SSH로 설정하려면:
+회전은 ES 메뉴(위 MULTISCREENS 섹션의 SCREEN ROTATION)에서 설정하는 게 정석 — 여기서 고른 값이 **SHARE 파티션**(SD카드를 컴퓨터에 꽂으면 보이는 두 번째 드라이브)의 `system/batocera.conf`에 저장됨. 이 파티션을 마운트해서 직접 편집하거나, SSH로:
 ```
-batocera-settings-set global.videooutput2 DSI-1        # VU8M을 2번째 화면으로
-batocera-settings-set display.rotate2.DSI-1 3          # VU8M 회전값 (개체마다 실제 장착 방향에 따라 다를 수 있음)
+batocera-settings-set display.rotate2.DSI-1 3   # VU8M을 2번째 화면으로 이미 지정했다는 전제 하에 그 회전값 설정
 reboot
 ```
 메인 화면 회전은 커넥터별로 `display.rotate.<커넥터이름>=<N>`(예: `display.rotate.HDMI-A-1`), 없으면 전역 `display.rotate=<N>`. `<N>`은 `0`(정상), `1`(90도), `2`(180도), `3`(270도).
 
-부팅 스플래시(ES가 뜨기 전 최초 로고 화면)도 메인 화면 회전값은 자동으로 따라감 — `batocera.conf`의 `display.rotate`/`display.rotate.<커넥터>`가 재부팅 시점에 `batocera-boot.conf`로 자동 동기화되고 스플래시가 그걸 읽음(vanilla 메커니즘, 별도 설정 불필요). 다만 이건 메인 화면 한정이고, VU8M을 2번째 화면(backglass)으로 쓸 때의 `display.rotate2`는 스플래시엔 적용 안 됨 — 애초에 스플래시는 2번째 화면엔 아무것도 그리지 않으니 상관없음.
+**주의**: `system/batocera.conf`는 기기가 **최초 1회 부팅**해서 SHARE 파티션을 초기화해야 생김 — 갓 구운 SD카드를 PC에 바로 꽂으면 이 파일도, `system` 폴더 자체도 없음(최초 부팅 시 Batocera가 SHARE 파티션에 `roms`/`bios`/`saves`/`system` 등 전체 기본 디렉토리 구조를 만듦). 위 설정은 기기를 한 번 부팅시킨 뒤에 할 것.
+
+메인 화면 회전은 부팅 스플래시(ES가 뜨기 전 최초 로고 화면)에도 재부팅 시점에 자동으로 반영됨(vanilla 메커니즘, 별도 설정 불필요) — VU8M을 2번째 화면으로 쓸 때의 `display.rotate2`는 여기 해당 안 됨(스플래시는 2번째 화면엔 아무것도 안 그림).
 
 ## 시스템별 성능 측정 결과 및 권장 코어/API
 
