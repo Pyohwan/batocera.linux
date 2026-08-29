@@ -30,11 +30,15 @@
 
 **주의**: 아래 설정이 저장되는 `system/batocera.conf`는 기기가 **최초 1회 부팅**해서 SHARE 파티션을 초기화해야 생김 — 갓 구운 SD카드를 PC에 바로 꽂으면 이 파일도, `system` 폴더 자체도 없음(최초 부팅 시 Batocera가 SHARE 파티션에 `roms`/`bios`/`saves`/`system` 등 전체 기본 디렉토리 구조를 만듦). 기기를 한 번 부팅시킨 뒤에 설정할 것.
 
-**백글래스로 쓰기**: VU8M을 메인 화면(HDMI) 게임 중 박스아트/게임 정보를 보여주는 보조 화면으로 쓰려면, ES 메뉴 **MULTISCREENS → BACKGLASS / INFORMATION SCREEN**에서 두 번째 비디오 출력으로 VU8M을 지정. **이 지정을 해야만** ES가 그 출력을 실제로 구성(해상도/회전 적용)함 — 비워두면 HDMI 옆에 이어붙는 미사용 확장 화면으로만 잡히고 아무것도 제대로 안 나옴.
+**백글래스로 쓰기**: VU8M을 메인 화면(HDMI) 게임 중 박스아트/게임 정보를 보여주는 보조 화면으로 쓰려면, ES 메뉴 **MAIN MENU → SYSTEM SETTINGS → HARDWARE → MULTISCREENS → BACKGLASS / INFORMATION SCREEN**에서 VIDEO OUTPUT을 VU8M(`DSI-1`)으로 지정. **이 지정을 해야만** ES가 그 출력을 실제로 구성(해상도/회전 적용)함 — 비워두면 HDMI 옆에 이어붙는 미사용 확장 화면으로만 잡히고 아무것도 제대로 안 나옴.
 
 **예외 — NDS 듀얼스크린**: NDS는 원래 화면이 위/아래 두 개라, HDMI+VU8M을 동시에 켜고 `melonDS` 코어를 쓰면 실제 물리 화면 두 개에 NDS의 위/아래 화면을 각각 나눠 출력할 수 있음. 다만 melonDS는 이 보드에서 성능이 안 좋아서(GPU가속 켜도 기본 권장 코어 drastic 대비 훨씬 느림) **사실상 실사용은 힘듦** — 듀얼스크린이 정말 꼭 필요한 경우가 아니면 기본값인 drastic(단일 화면)을 쓸 것.
 
-**회전 설정**: ES 메뉴(위 MULTISCREENS 섹션의 SCREEN ROTATION)에서 하는 게 정석 — 여기서 고른 값이 **SHARE 파티션**(SD카드를 컴퓨터에 꽂으면 보이는 두 번째 드라이브)의 `system/batocera.conf`에 저장됨. 이 파티션을 마운트해서 직접 편집하거나, SSH로:
+**회전 설정**: ES 메뉴에서 하는 게 정석 — 단, 라벨이 둘 다 "SCREEN ROTATION"이라 위치로 구분해야 함:
+- **MAIN MENU → SYSTEM SETTINGS → HARDWARE → SCREEN ROTATION**: 메인 화면(HDMI) 회전.
+- **MAIN MENU → SYSTEM SETTINGS → HARDWARE → MULTISCREENS → BACKGLASS / INFORMATION SCREEN → SCREEN ROTATION**: VU8M(백글래스) 회전. (여기서 고른 값이 위 VIDEO OUTPUT과 함께 저장됨)
+
+이 값들은 **SHARE 파티션**(SD카드를 컴퓨터에 꽂으면 보이는 두 번째 드라이브)의 `system/batocera.conf`에 저장됨. 이 파티션을 마운트해서 직접 편집하거나, SSH로:
 ```
 batocera-settings-set global.videooutput2 DSI-1   # VU8M을 2번째 화면(백글래스)으로 지정
 batocera-settings-set display.rotate2.DSI-1 3      # 그 화면의 회전값
