@@ -557,8 +557,17 @@ int main(int argc, char* argv[]) {
     if (TTF_Init() < 0) return 1;
 
     // Separate Bold (Headers) from Regular weight (Descriptions)
+    // Noto Sans KR checked first in both lists below: it's a variable font
+    // with full Latin+CJK coverage in one file (Google Noto design goal),
+    // so using it as the primary choice (not just a Korean-only fallback)
+    // renders both scripts consistently without per-glyph font switching,
+    // which SDL_ttf/TTF_RenderUTF8_Blended_Wrapped can't do anyway (one
+    // font per call). Without this, Korean text (game titles, backglass
+    // metadata) silently rendered as missing-glyph boxes - DejaVu/
+    // Liberation below have no CJK glyphs at all.
     std::string font_path_header = "";
     std::vector<std::string> header_font_candidates = {
+        "/usr/share/fonts/truetype/noto/NotoSansKR-VF.ttf",
         "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
         "/usr/share/fonts/dejavu/DejaVuSans.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -574,6 +583,7 @@ int main(int argc, char* argv[]) {
 
     std::string font_path_desc = "";
     std::vector<std::string> desc_font_candidates = {
+        "/usr/share/fonts/truetype/noto/NotoSansKR-VF.ttf",
         "/usr/share/fonts/dejavu/DejaVuSans.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "/usr/share/fonts/TTF/DejaVuSans.ttf",
