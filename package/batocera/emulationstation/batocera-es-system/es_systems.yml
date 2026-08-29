@@ -215,9 +215,9 @@ n64:
   extensions: [z64, n64, v64, zip, 7z]
   emulators:
     mupen64plus:
-      gliden64:   { requireAnyOf: [BR2_PACKAGE_MUPEN64PLUS_GLIDEN64], incompatible_extensions: [zip, 7z] }
-      glide64mk2: { requireAnyOf: [BR2_PACKAGE_MUPEN64PLUS_VIDEO_GLIDE64MK2], incompatible_extensions: [zip, 7z] }
       rice:       { requireAnyOf: [BR2_PACKAGE_MUPEN64PLUS_VIDEO_RICE], incompatible_extensions: [zip, 7z] }
+      glide64mk2: { requireAnyOf: [BR2_PACKAGE_MUPEN64PLUS_VIDEO_GLIDE64MK2], incompatible_extensions: [zip, 7z] }
+      gliden64:   { requireAnyOf: [BR2_PACKAGE_MUPEN64PLUS_GLIDEN64], incompatible_extensions: [zip, 7z] }
     libretro:
       mupen64plus-next: { requireAnyOf: [BR2_PACKAGE_LIBRETRO_MUPEN64PLUS_NEXT] }
       parallel_n64:     { requireAnyOf: [BR2_PACKAGE_LIBRETRO_PARALLEL_N64] }
@@ -368,14 +368,14 @@ nds:
   hardware: portable
   extensions: [nds, bin, zip, 7z]
   emulators:
+    drastic:
+      drastic: { requireAnyOf: [BR2_PACKAGE_DRASTIC], incompatible_extensions: [7z] }
     libretro:
       desmume:    { requireAnyOf: [BR2_PACKAGE_LIBRETRO_DESMUME] }
       melonds:    { requireAnyOf: [BR2_PACKAGE_LIBRETRO_MELONDS] }
       melondsds:  { requireAnyOf: [BR2_PACKAGE_LIBRETRO_MELONDS_DS] }
     melonds:
       melonds: { requireAnyOf: [BR2_PACKAGE_MELONDS] }
-    drastic:
-      drastic: { requireAnyOf: [BR2_PACKAGE_DRASTIC], incompatible_extensions: [7z] }
 
 fds:
   name:       Family Computer Disk System
@@ -434,11 +434,11 @@ dreamcast:
   hardware: console
   extensions: [cdi, cue, gdi, chd, m3u]
   emulators:
+    flycast:
+      flycast:        { requireAnyOf: [BR2_PACKAGE_FLYCAST]          }
     libretro:
       flycast:      { requireAnyOf: [BR2_PACKAGE_LIBRETRO_FLYCAST] }
       flycastvl:    { requireAnyOf: [BR2_PACKAGE_LIBRETRO_FLYCASTVL] }
-    flycast:
-      flycast:        { requireAnyOf: [BR2_PACKAGE_FLYCAST]          }
     redream:
       redream:        { requireAnyOf: [BR2_PACKAGE_REDREAM]          }
   comment_en: |
@@ -2159,9 +2159,9 @@ saturn:
   extensions: [cue, ccd, m3u, chd, iso, zip, mds]
   emulators:
     libretro:
+      yabasanshiro:  { requireAnyOf: [BR2_PACKAGE_LIBRETRO_YABASANSHIRO], incompatible_extensions: [m3u] }
       beetle-saturn: { requireAnyOf: [BR2_PACKAGE_LIBRETRO_BEETLE_SATURN], incompatible_extensions: [zip] }
       kronos:        { requireAnyOf: [BR2_PACKAGE_LIBRETRO_KRONOS] }
-      yabasanshiro:  { requireAnyOf: [BR2_PACKAGE_LIBRETRO_YABASANSHIRO], incompatible_extensions: [m3u] }
     ymir:
       ymir: { requireAnyOf: [BR2_PACKAGE_YMIR] }
 
@@ -2287,6 +2287,8 @@ ps2:
   hardware: console
   extensions: [iso, mdf, nrg, bin, img, dump, gz, cso, chd, m3u, zso]
   emulators:
+    aethersx2:
+      aethersx2: { requireAnyOf: [BR2_PACKAGE_AETHERSX2], incompatible_extensions: [m3u] }
     pcsx2:
       pcsx2: { requireAnyOf: [BR2_PACKAGE_PCSX2], incompatible_extensions: [m3u] }
     libretro:

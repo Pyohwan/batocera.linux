@@ -241,10 +241,11 @@ class MelonDSGenerator(Generator):
                 "XDG_CONFIG_HOME": CONFIGS,
                 "XDG_DATA_HOME": SAVES,
                 # Default Qt platform ("xcb") aborts immediately - this board
-                # has neither X11 nor a working Wayland-client EGL path (see
-                # melonds.mk). "eglfs" (direct KMS/GBM) is the one that
-                # actually works here, same EGL platform every other
-                # consumer on this board already uses.
-                "QT_QPA_PLATFORM": "eglfs"
+                # has no X11. "eglfs" was used historically (see melonds.mk)
+                # while Wayland-client EGL was broken, but Track C's labwc
+                # compositor now supports it - "wayland" is required for the
+                # melonds_dual_screen (Window0/Window1 -> separate outputs)
+                # feature, since eglfs has no per-window output placement.
+                "QT_QPA_PLATFORM": "wayland"
             }
         )

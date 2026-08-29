@@ -226,6 +226,11 @@ define BATOCERA_EMULATIONSTATION_WAYLAND_LABWC
 	    $(TARGET_DIR)/usr/bin/labwc-launch
 endef
 
+define BATOCERA_EMULATIONSTATION_ODROIDM1_INPUT
+	python3 $(BATOCERA_EMULATIONSTATION_PKGDIR)/controllers/odroidm1_patch_es_input.py \
+	    $(TARGET_DIR)/usr/share/emulationstation/es_input.cfg
+endef
+
 define BATOCERA_EMULATIONSTATION_BOOT
 	$(INSTALL) -D -m 0755 $(BATOCERA_EMULATIONSTATION_PKGDIR)/S31emulationstation \
 	    $(TARGET_DIR)/etc/init.d/S31emulationstation
@@ -247,5 +252,17 @@ BATOCERA_EMULATIONSTATION_PRE_CONFIGURE_HOOKS += BATOCERA_EMULATIONSTATION_RPI_F
 BATOCERA_EMULATIONSTATION_PRE_CONFIGURE_HOOKS += BATOCERA_EMULATIONSTATION_EXTERNAL_POS
 BATOCERA_EMULATIONSTATION_POST_INSTALL_TARGET_HOOKS += BATOCERA_EMULATIONSTATION_RESOURCES
 BATOCERA_EMULATIONSTATION_POST_INSTALL_TARGET_HOOKS += BATOCERA_EMULATIONSTATION_BOOT
+
+## odroid-m1: SHAKS S6b default gamepad mapping + keyboard hotkey==select,
+## appended onto whatever upstream's es_input.cfg currently is (not a full
+## fsoverlay replacement - this file is upstream's actively-maintained
+## controller DB, freezing the whole thing would silently drop every future
+## upstream controller mapping addition). Must run after BOOT above, which
+## is what actually copies the pristine es_input.cfg to TARGET_DIR - hooks
+## run in registration order, not definition order, so registering this
+## any earlier gets the patch silently clobbered by that copy.
+ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_BSP_ODROIDM1),y)
+BATOCERA_EMULATIONSTATION_POST_INSTALL_TARGET_HOOKS += BATOCERA_EMULATIONSTATION_ODROIDM1_INPUT
+endif
 
 $(eval $(cmake-package))

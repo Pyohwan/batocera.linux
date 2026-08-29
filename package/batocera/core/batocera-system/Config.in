@@ -340,16 +340,24 @@ config BR2_PACKAGE_BATOCERA_SYSTEM
 	select BR2_PACKAGE_NEW_LG4FF			if !BR2_PACKAGE_BATOCERA_TARGET_XU4 && !BR2_PACKAGE_BATOCERA_TARGET_BCM2835 && !BR2_PACKAGE_BATOCERA_TARGET_RK3326 && !BR2_PACKAGE_BATOCERA_TARGET_RK3128 && !BR2_PACKAGE_BATOCERA_TARGET_QCS6490 && !BR2_PACKAGE_BATOCERA_TARGET_SM6115 && !BR2_PACKAGE_BATOCERA_TARGET_SM8250 && !BR2_PACKAGE_BATOCERA_TARGET_SM8550 && !BR2_PACKAGE_BATOCERA_TARGET_SM8750 && !BR2_PACKAGE_BATOCERA_TARGET_T527 && !BR2_PACKAGE_BATOCERA_TARGET_SDM845 && !BR2_PACKAGE_BATOCERA_TARGET_H700 # Improved Linux module driver for Logitech driving wheels (the lg4ff is disabled in kernels)
 	select BR2_PACKAGE_HID_T150             if !BR2_PACKAGE_HOST_LINUX_HEADERS_CUSTOM_4_4 # Thrustmaster T150 and TMX Force Feedback Wheel Linux drivers
 	select BR2_PACKAGE_HID_TMFF2            if !BR2_PACKAGE_HOST_LINUX_HEADERS_CUSTOM_4_4 # Thrustmaster T300RS, T248 and (experimental) TX, T128, T-GT II and TS-XW Wheel Linux drivers
-	select BR2_PACKAGE_LOGITECH_TRUEFORCE   if BR2_TOOLCHAIN_HEADERS_AT_LEAST_6_1 # Logitech RS50 & G PRO direct drive wheels (force feedback + TrueForce)
-	select BR2_PACKAGE_LOGI_WHEEL           if BR2_TOOLCHAIN_HEADERS_AT_LEAST_6_1 && BR2_PACKAGE_HOST_RUSTC_TARGET_ARCH_SUPPORTS # terminal settings app for the wheels above
+	# BSP_ODROIDM1 excluded: this board's kernel reports headers 6.1 but is
+	# a heavily backported hardkernel BSP fork, not vanilla 6.1 - it
+	# already carries the `const` hid_ll_driver qualifier that mainline
+	# only added around 6.2+. logitech-trueforce's "less-than-6.2" patch
+	# codepath assumes 6.1 means pre-const, so it fails to build here with
+	# -Werror=discarded-qualifiers (hdev->ll_driver = ps->real_ll_driver).
+	# Same root-cause class as this board's xone kernel-version pin above.
+	select BR2_PACKAGE_LOGITECH_TRUEFORCE   if BR2_TOOLCHAIN_HEADERS_AT_LEAST_6_1 && !BR2_PACKAGE_BATOCERA_TARGET_BSP_ODROIDM1 # Logitech RS50 & G PRO direct drive wheels (force feedback + TrueForce)
+	select BR2_PACKAGE_LOGI_WHEEL           if BR2_TOOLCHAIN_HEADERS_AT_LEAST_6_1 && BR2_PACKAGE_HOST_RUSTC_TARGET_ARCH_SUPPORTS && !BR2_PACKAGE_BATOCERA_TARGET_BSP_ODROIDM1 # terminal settings app for the wheels above
 	select BR2_PACKAGE_HID_NX				if !BR2_TOOLCHAIN_HEADERS_AT_LEAST_6_7 && !BR2_PACKAGE_HOST_LINUX_HEADERS_CUSTOM_4_4 && !BR2_PACKAGE_BATOCERA_TARGET_BCM2835 && !BR2_PACKAGE_BATOCERA_TARGET_RK3326 # updated nintendo switch controller driver, requires kernel > 4.4
 	select BR2_PACKAGE_JOYCOND				if BR2_PACKAGE_HID_NX || BR2_TOOLCHAIN_HEADERS_AT_LEAST_6_7 # nintendo switch joycon daemon (requires hid-nx or hid-nintendo in kernel 6.7 or later)
 	select BR2_PACKAGE_KEYBOARDTOPADS
 	select BR2_PACKAGE_NSO_N64              if BR2_PACKAGE_HID_NX
 
-	select BR2_PACKAGE_ROCKNIX_JOYPAD    if BR2_PACKAGE_BATOCERA_TARGET_RK3326 || \
+	select BR2_PACKAGE_ROCKNIX_JOYPAD    if (BR2_PACKAGE_BATOCERA_TARGET_RK3326 || \
 	                                        BR2_PACKAGE_BATOCERA_TARGET_RK3568 || \
-											BR2_PACKAGE_BATOCERA_TARGET_H700
+											BR2_PACKAGE_BATOCERA_TARGET_H700) && \
+											!BR2_PACKAGE_BATOCERA_TARGET_BSP_ODROIDM1
 
 	select BR2_PACKAGE_UPOWER # required by some cemuhook servers
 
@@ -799,6 +807,15 @@ config BR2_PACKAGE_BATOCERA_TARGET_JH7110
 
 endchoice
 
+# Board identity for the ODROID-M1 dedicated target (configs/batocera-rk3568-odroidm1.board),
+# as opposed to BR2_PACKAGE_UBOOT_ODROID_M1, which the shared 11-board rk3568
+# target (configs/batocera-rk3568.board) also selects - that symbol is a
+# bootloader package flag, not a board identity, and using it as a "not this
+# board" proxy silently affects the other 10 boards on the shared target too.
+config BR2_PACKAGE_BATOCERA_TARGET_BSP_ODROIDM1
+	bool "odroidm1 dedicated bsp target"
+	default n
+
 config BR2_PACKAGE_BATOCERA_EXTRAS
 	bool "batocera.linux tools packages selection"
 
@@ -1195,7 +1212,7 @@ config BR2_PACKAGE_BATOCERA_PORTS_SYSTEMS
 
 	# Quake 2
 	select BR2_PACKAGE_LIBRETRO_VITAQUAKE2    if BR2_PACKAGE_BATOCERA_GLES3
-	select BR2_PACKAGE_VKQUAKE2		          if BR2_PACKAGE_BATOCERA_VULKAN && BR2_PACKAGE_XORG7
+	select BR2_PACKAGE_VKQUAKE2		          if BR2_PACKAGE_BATOCERA_VULKAN && BR2_PACKAGE_XORG7 && BR2_PACKAGE_HAS_LIBGL
 	select BR2_PACKAGE_YQUAKE2		# ALL
 	select BR2_PACKAGE_YQUAKE2_XATRIX	if BR2_PACKAGE_YQUAKE2	# Mission Packs
 	select BR2_PACKAGE_YQUAKE2_ROGUE	if BR2_PACKAGE_YQUAKE2
@@ -1218,7 +1235,7 @@ config BR2_PACKAGE_BATOCERA_PORTS_SYSTEMS
 	select BR2_PACKAGE_LIBRETRO_BOOM3		if BR2_PACKAGE_BATOCERA_TARGET_X86_64_ANY # Requires RA with OpenGL
 
 	# Tomb Raider 1, 2 & 3
-	select BR2_PACKAGE_TRX		            if BR2_PACKAGE_XORG7
+	select BR2_PACKAGE_TRX		            if BR2_PACKAGE_XORG7 && BR2_PACKAGE_HAS_LIBGL
 
 	# Quake 3
 	select BR2_PACKAGE_IOQUAKE3    if !BR2_PACKAGE_BATOCERA_TARGET_BCM2835 && \
@@ -1446,11 +1463,16 @@ config BR2_PACKAGE_BATOCERA_CONSOLE_SYSTEMS
 	select BR2_PACKAGE_BATOCERA_SEGADC
 
 	# PSX
+	# duckstation.mk pulls in full BR2_PACKAGE_MESA3D once BATOCERA_VULKAN is
+	# on, which mesa3d-headers.mk (used by vendor-blob boards instead of full
+	# Mesa) hard-stops the build if combined with - see ODROID-M1 Track C
+	# board notes / project memory for the live conflict.
+	# newer versions of duckstation are stricter on OpenGL 3.1
+	# requires X11 or Sway. 2GB boards aren't great.
 	select BR2_PACKAGE_DUCKSTATION    if BR2_PACKAGE_BATOCERA_GLES3 && \
 	                                     !BR2_PACKAGE_BATOCERA_TARGET_RK3326 && \
-										 !BR2_PACKAGE_BATOCERA_TARGET_S9GEN4
-										 # newer versions of duckstation are stricter on OpenGL 3.1
-										 # requires X11 or Sway. 2GB boards aren't great.
+										 !BR2_PACKAGE_BATOCERA_TARGET_S9GEN4 && \
+										 !(BR2_PACKAGE_MESA3D_HEADERS && BR2_PACKAGE_BATOCERA_VULKAN)
 
 	select BR2_PACKAGE_DUCKSTATION_LEGACY		if !BR2_PACKAGE_BATOCERA_GLES3			&& \
 							   !BR2_riscv					&& \
@@ -2245,7 +2267,7 @@ config BR2_PACKAGE_BATOCERA_SDL3
 	select BR2_PACKAGE_SDL3_TTF
 	select BR2_PACKAGE_SDL3_OPENGLES    if BR2_PACKAGE_HAS_LIBGLES
 	select BR2_PACKAGE_SDL3_OPENGL		if BR2_PACKAGE_HAS_LIBGL
-	select BR2_PACKAGE_SDL3_X11			if BR2_PACKAGE_XORG7
+	select BR2_PACKAGE_SDL3_X11			if BR2_PACKAGE_XORG7 && !BR2_PACKAGE_BATOCERA_TARGET_BSP_ODROIDM1
 	select BR2_PACKAGE_SDL3_KMSDRM		if BR2_PACKAGE_HAS_LIBGBM && !BR2_PACKAGE_BATOCERA_RPI_VCORE
 	select BR2_PACKAGE_SDL3_WAYLAND		if BR2_PACKAGE_BATOCERA_WAYLAND
 	select BR2_PACKAGE_BATOCERA_HAS_SDL

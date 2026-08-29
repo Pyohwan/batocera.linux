@@ -3,28 +3,24 @@
 # mali-g52-odroidm1
 #
 ################################################################################
-# Userspace blob is g24p0 (DDK generation newer than the g13p0 the hardkernel
-# BSP kernel's kbase was originally paired with) - live-tested on real
-# hardware by swapping just this file against our unchanged 6.1 kernel/kbase
-# first: no kbase UK-ABI mismatch, ES/EGL init and rendering all fine. Picked
-# over the LinuxFactory-distributed g13p0 .deb (still the peripheral-files
-# source below - OpenCL vendor JSON/profile.d, unrelated to blob version) for
-# the extra EGL 1.5 surface it exposes (eglGetPlatformDisplay natively, plus
-# EGL_EXT_platform_base/EGL_KHR_platform_gbm/EGL_ANDROID_native_fence_sync
-# strings confirmed present via nm/strings) - g13p0 lacks these, which is
-# what excluded moonlight-qt from this board's build and is suspected (not
-# confirmed) as part of the mangohud/SDL_CreateWindow EGL interaction bug.
-# Source: https://github.com/JeffyCN/mirrors, "libmali" branch - the
-# Rockchip-community-standard libmali distribution (other mirrors sync from
-# it). Pinned to a specific commit rather than the branch HEAD for
-# reproducible builds.
-MALI_G52_ODROIDM1_G24P0_COMMIT = 077bc8f582c5da0cb80136a711ce3be2fa1a04cd
-MALI_G52_ODROIDM1_G24P0_SOURCE = libmali-bifrost-g52-g24p0-wayland-gbm.so
-MALI_G52_ODROIDM1_G24P0_SITE = https://raw.githubusercontent.com/JeffyCN/mirrors/$(MALI_G52_ODROIDM1_G24P0_COMMIT)/lib/aarch64-linux-gnu
+# Track C: userspace blob is g29p1, the unified GLES+Vulkan build (DDK
+# generation newer than g24p0, which A/B use) - gate 1 (2026-08-12) live-
+# swapped just this file on an A image against our unchanged 6.1 kernel/
+# kbase: no UK-ABI mismatch, GLES survived (ES System Info showed real
+# GLSL ES 3.20/GL_VERSION strings), and vulkaninfo enumerated the GPU
+# ("Mali-G52", DRIVER_ID_ARM_PROPRIETARY) - vendor g25p0 kbase accepts
+# g29p1 userspace as-is, no out-of-tree kbase module needed (see
+# project_odroid_retro_track_c_v3.md gate 1/light-path). Source:
+# https://github.com/JeffyCN/mirrors, "libmali-next" branch (not "libmali"
+# - g29p1 isn't published on the branch g24p0 used). Pinned to a specific
+# commit rather than the branch HEAD for reproducible builds.
+MALI_G52_ODROIDM1_G29P1_COMMIT = 4233031d818e97a19e8a9cdbbd5c15795ededd93
+MALI_G52_ODROIDM1_G29P1_SOURCE = libmali-bifrost-g52-g29p1.so
+MALI_G52_ODROIDM1_G29P1_SITE = https://raw.githubusercontent.com/JeffyCN/mirrors/$(MALI_G52_ODROIDM1_G29P1_COMMIT)/lib/aarch64-linux-gnu
 
 # Peripheral files only (OpenCL vendor ICD JSON, profile.d, copyright) still
 # come from the LinuxFactory g13p0 .deb - the actual libmali.so.1.9.0 binary
-# extracted from it gets overwritten with the g24p0 blob above in
+# extracted from it gets overwritten with the g29p1 blob above in
 # EXTRACT_CMDS, same live-tested swap, just made to persist across rebuilds.
 MALI_G52_ODROIDM1_VERSION = 1.9-5+202604211715~resolute
 MALI_G52_ODROIDM1_SOURCE = libmali-bifrost-g52-g13p0-wayland-gbm_$(MALI_G52_ODROIDM1_VERSION)_arm64.deb
@@ -45,7 +41,7 @@ MALI_G52_ODROIDM1_DEPENDENCIES = libdrm wayland mesa3d-headers
 # doesn't ship.
 MALI_G52_ODROIDM1_HEADERS_VERSION = ad4c28932c3d07c75fc41dd4a3333f9013a25e7f
 MALI_G52_ODROIDM1_EXTRA_DOWNLOADS = https://github.com/batocera-linux/rockchip-packages/releases/download/20220303/libmali-$(MALI_G52_ODROIDM1_HEADERS_VERSION).tar.gz
-MALI_G52_ODROIDM1_EXTRA_DOWNLOADS += $(MALI_G52_ODROIDM1_G24P0_SITE)/$(MALI_G52_ODROIDM1_G24P0_SOURCE)
+MALI_G52_ODROIDM1_EXTRA_DOWNLOADS += $(MALI_G52_ODROIDM1_G29P1_SITE)/$(MALI_G52_ODROIDM1_G29P1_SOURCE)
 
 define MALI_G52_ODROIDM1_EXTRACT_CMDS
 	$(AR) --output=$(@D) -x $(MALI_G52_ODROIDM1_DL_DIR)/$(MALI_G52_ODROIDM1_SOURCE)
@@ -73,11 +69,11 @@ define MALI_G52_ODROIDM1_EXTRACT_CMDS
 	# convention this file is essentially a placeholder (GLES3 extensions
 	# are declared in GLES2/gl2ext.h instead) - ship that standard content.
 	cp $(MALI_G52_ODROIDM1_PKGDIR)/gl3ext.h $(@D)/usr/include/GLES3/gl3ext.h
-	# Overwrite the g13p0 binary the .deb shipped with the g24p0 blob -
+	# Overwrite the g13p0 binary the .deb shipped with the g29p1 blob -
 	# same filename (libmali.so.1.9.0), so every symlink/pkgconfig/
 	# ld.so.preload path below still applies unchanged. Live-tested this
 	# exact swap on real hardware first (see header comment).
-	cp $(MALI_G52_ODROIDM1_DL_DIR)/$(MALI_G52_ODROIDM1_G24P0_SOURCE) \
+	cp $(MALI_G52_ODROIDM1_DL_DIR)/$(MALI_G52_ODROIDM1_G29P1_SOURCE) \
 		$(@D)/usr/lib/aarch64-linux-gnu/libmali.so.1.9.0
 	# On a real dpkg system these top-level sonames get created by
 	# update-alternatives at install time (nothing in this .deb's own
@@ -92,8 +88,23 @@ define MALI_G52_ODROIDM1_EXTRACT_CMDS
 	# anything else) meant to be fixed up at runtime by libmali-hook /
 	# mali-priority.sh: not something a static link at build time can
 	# rely on. libmali.so.1.9.0 exports every symbol directly (EGL,
-	# GLESv1/2, GBM, wayland-egl - confirmed each with nm -D).
-	for lib in EGL:1 GLESv1_CM:1 GLESv2:2 MaliOpenCL:1 gbm:1 wayland-egl:1; do \
+	# GLESv1/2, GBM - confirmed each with nm -D).
+	#
+	# wayland-egl is NOT in this list (was, up to track C): it doesn't
+	# belong to the GPU driver at all - wl_egl_window_* is pure struct
+	# bookkeeping (a malloc'd width/height/surface-pointer record the EGL
+	# platform code reads directly), not a real driver entry point, so
+	# it's the upstream wayland.org project's own reference impl that
+	# ships it - and buildroot's plain "wayland" package already builds
+	# and installs a real, working libwayland-egl.so.1 (confirmed via
+	# nm -D: wl_egl_window_create/destroy/resize/get_attached_size all
+	# present). g29p1 doesn't export any of these under either name
+	# (confirmed via nm -D on the raw blob) - aliasing to libmali.so.1.9.0
+	# like the others silently overwrote wayland's real implementation
+	# with a broken one, only noticed once track C turned Wayland on and
+	# something that actually creates an EGL window surface (kodi, then
+	# libgtk3's Wayland GDK backend) tried to link against it.
+	for lib in EGL:1 GLESv1_CM:1 GLESv2:2 MaliOpenCL:1 gbm:1; do \
 		name=$${lib%%:*}; ver=$${lib##*:}; \
 		ln -sf libmali.so.1.9.0 $(@D)/usr/lib/aarch64-linux-gnu/lib$${name}.so.$${ver}; \
 		ln -sf lib$${name}.so.$${ver} $(@D)/usr/lib/aarch64-linux-gnu/lib$${name}.so; \
@@ -111,19 +122,33 @@ define MALI_G52_ODROIDM1_INSTALL_STAGING_CMDS
 	# eglplatform.h logic, so patch its staged copy the same way.
 	grep -q MESA_EGL_NO_X11_HEADERS $(STAGING_DIR)/usr/include/EGL/eglplatform.h || \
 		sed -i '1a #define MESA_EGL_NO_X11_HEADERS 1' $(STAGING_DIR)/usr/include/EGL/eglplatform.h
-	# This vendor gbm.h (2022-03 snapshot) predates upstream Mesa's standard
-	# name for per-plane DMA-BUF export: it only declares the fd itself as
-	# gbm_bo_get_fd_per_plane (confirmed still exported under that name by
-	# nm -D on libmali.so.1.9.0), not the gbm_bo_get_fd_for_plane name
-	# wlroots >= 0.18 actually calls. Same function/signature, alias it.
+	# This vendor gbm.h never declares gbm_bo_get_fd_for_plane, the name
+	# upstream Mesa standardized on and wlroots >= 0.18 actually calls -
+	# g13p0-era blobs only exported the pre-standardization name
+	# (gbm_bo_get_fd_per_plane) under the hood, so this used to always
+	# inject a declare-and-alias-the-old-name macro. g24p0's
+	# libmali.so.1.9.0 has since started exporting gbm_bo_get_fd_for_plane
+	# directly (confirmed via nm -D) - the vendor's header text just never
+	# caught up - so aliasing to per_plane unconditionally now points at a
+	# symbol that no longer exists in the .so, breaking the link instead of
+	# fixing it (invisible until wlroots, the first real caller of this
+	# symbol on this board, failed with "undefined reference to
+	# gbm_bo_get_fd_per_plane"). Check the actual exported symbol table so
+	# this keeps working across blob versions either way: alias only if the
+	# .so genuinely lacks the modern name, otherwise just declare it (the
+	# .so already has it, only the header prototype is missing).
 	# Insert right before the closing "#ifdef __cplusplus / }" block (the
 	# second occurrence) so it stays inside both extern "C" and the
 	# include guard, instead of a blind end-of-file append.
 	if ! grep -q gbm_bo_get_fd_for_plane $(STAGING_DIR)/usr/include/gbm.h; then \
+		if nm -D $(STAGING_DIR)/usr/lib/libmali.so.1.9.0 | grep -q ' T gbm_bo_get_fd_for_plane$$'; then \
+			DECL='int\ngbm_bo_get_fd_for_plane(struct gbm_bo *bo, int plane);\n\n'; \
+		else \
+			DECL='int\ngbm_bo_get_fd_per_plane(struct gbm_bo *bo, int plane);\n#define gbm_bo_get_fd_for_plane gbm_bo_get_fd_per_plane\n\n'; \
+		fi; \
 		LINE=$$(grep -n '^#ifdef __cplusplus' $(STAGING_DIR)/usr/include/gbm.h | tail -1 | cut -d: -f1); \
 		head -n $$((LINE-1)) $(STAGING_DIR)/usr/include/gbm.h > $(STAGING_DIR)/usr/include/gbm.h.new; \
-		printf 'int\ngbm_bo_get_fd_per_plane(struct gbm_bo *bo, int plane);\n#define gbm_bo_get_fd_for_plane gbm_bo_get_fd_per_plane\n\n' \
-			>> $(STAGING_DIR)/usr/include/gbm.h.new; \
+		printf "$$DECL" >> $(STAGING_DIR)/usr/include/gbm.h.new; \
 		tail -n +$$LINE $(STAGING_DIR)/usr/include/gbm.h >> $(STAGING_DIR)/usr/include/gbm.h.new; \
 		mv $(STAGING_DIR)/usr/include/gbm.h.new $(STAGING_DIR)/usr/include/gbm.h; \
 	fi
@@ -155,6 +180,19 @@ define MALI_G52_ODROIDM1_INSTALL_TARGET_CMDS
 	# every process's global scope via ld.so.preload (confirmed fix,
 	# tested live via LD_PRELOAD) sidesteps whatever the exact defect is.
 	echo "/usr/lib/libmali.so.1.9.0" >> $(TARGET_DIR)/etc/ld.so.preload
+	# The g13p0 .deb this package's peripheral files come from ships no
+	# Vulkan ICD manifest at all (unlike the sibling mali-G52 package's
+	# source, which needed 001-fix-vulkan-icd-path.patch for one that DID
+	# exist) - without this, the Khronos loader reports "Found no
+	# drivers!" and every Vulkan app fails at vkCreateInstance with
+	# VK_ERROR_INCOMPATIBLE_DRIVER, regardless of vulkan-loader/
+	# vulkan-wsi-layer being otherwise correctly set up. Confirmed via a
+	# live single-binary test (VK_LOADER_DEBUG=all showed the exact
+	# "Found no drivers!" message) - this had only ever been patched in
+	# live via manual scp during earlier debugging, never captured here.
+	mkdir -p $(TARGET_DIR)/usr/share/vulkan/icd.d
+	$(INSTALL) -D -m 0644 $(MALI_G52_ODROIDM1_PKGDIR)/mali.icd.json \
+		$(TARGET_DIR)/usr/share/vulkan/icd.d/mali.json
 endef
 
 $(eval $(generic-package))

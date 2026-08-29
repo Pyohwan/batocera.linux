@@ -1,0 +1,33 @@
+--- a/layer/swapchain_api.cpp
++++ b/layer/swapchain_api.cpp
+@@ -30,6 +30,8 @@
+ 
+ #include <cassert>
+ #include <cstdlib>
++#include <cstdio>
++#include <ctime>
+ #include <new>
+ 
+ #include "private_data.hpp"
+@@ -169,6 +171,21 @@
+    assert(queue != VK_NULL_HANDLE);
+    assert(pPresentInfo != nullptr);
+ 
++   /* frametime logger (env FRAMETIME_LOG_VK) */
++   {
++      static FILE *ft_log = [] {
++         const char *p = getenv("FRAMETIME_LOG_VK");
++         return p ? fopen(p, "w") : nullptr;
++      }();
++      if (ft_log)
++      {
++         struct timespec ts;
++         clock_gettime(CLOCK_MONOTONIC, &ts);
++         fprintf(ft_log, "%lld\n",
++                 (long long)(ts.tv_sec * 1000000LL + ts.tv_nsec / 1000));
++      }
++   }
++
+    layer::device_private_data &device_data = layer::device_private_data::get(queue);
+ 
+    if (!device_data.layer_owns_all_swapchains(pPresentInfo->pSwapchains, pPresentInfo->swapchainCount))

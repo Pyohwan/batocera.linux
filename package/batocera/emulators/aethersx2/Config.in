@@ -1,0 +1,43 @@
+config BR2_PACKAGE_AETHERSX2
+	bool "aethersx2"
+	depends on BR2_aarch64
+	select BR2_PACKAGE_BATOCERA_QT6
+	select BR2_PACKAGE_LIBGPG_ERROR
+	select BR2_PACKAGE_LIBPCAP
+	select BR2_PACKAGE_LIBCURL
+	# the prebuilt binary NEEDs libXrandr.so.2 (pulled in by Qt's xcb
+	# platform plugin at link time; never actually called at runtime here
+	# - aethersx2Generator.py forces QT_QPA_PLATFORM=wayland, so the xcb
+	# plugin path this satisfies is never taken - same "NEEDED-pass only"
+	# story as the GL/GLX shims in aethersx2/libs/). Built for real via
+	# buildroot here rather than vendored like those - libX11/libXext/
+	# libXrender/libXrandr have no ABI or missing-feature blocker the way
+	# our own libcurl/libssl builds do (see aethersx2/libs/README.md), so
+	# there's no reason not to build them properly. xlib_libXrandr's own
+	# Config.in already selects XLIB_LIBXEXT/XLIB_LIBXRENDER/XLIB_LIBX11/
+	# XORGPROTO, but all of that lives inside "if BR2_PACKAGE_XORG7"
+	# (=n on this Wayland-only board) - a select landing on a symbol
+	# there still forces it to y (Kconfig WARNING only), but that
+	# symbol's own further selects don't reliably cascade past the
+	# unmet-dependency node (confirmed with melonDS's X11 chain, see
+	# melonds/Config.in) - flattened here for the same reason.
+	select BR2_PACKAGE_XLIB_LIBXRANDR
+	select BR2_PACKAGE_XLIB_LIBXEXT
+	select BR2_PACKAGE_XLIB_LIBXRENDER
+	select BR2_PACKAGE_XLIB_LIBX11
+	select BR2_PACKAGE_XORGPROTO
+	help
+	  AetherSX2 is a prebuilt aarch64 PlayStation 2 emulator binary,
+	  vendored as-is from ROCKNIX (same one they ship as the default PS2
+	  core on RK3566 boards). Its GS renderer is an older branch (hardened
+	  for Android-era Adreno/Mali by Tahlreth) that avoids the real Mali
+	  G52 GPU hardware fault (DATA_INVALID_FAULT) that newer mainline
+	  PCSX2-derived forks (including the bmdhacks fork this board's own
+	  pcsx2 package uses) hit on this g29p1 blob - live-tested 5+ minutes
+	  fault-free where bmdhacks/pcsx2 reliably faults within ~100s.
+
+	  Personal-build only: not upstream-contributable due to AetherSX2's
+	  past GPL dispute history (bmdhacks was adopted upstream as the
+	  replacement for exactly that reason).
+
+	  https://github.com/ROCKNIX/packages

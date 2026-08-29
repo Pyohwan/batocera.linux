@@ -68,7 +68,14 @@ SDL3_CONF_OPTS += -DSDL_LIBUDEV=OFF
 endif
 
 ifeq ($(BR2_PACKAGE_BATOCERA_VULKAN),y)
-SDL3_DEPENDENCIES += mesa3d vulkan-loader
+SDL3_DEPENDENCIES += vulkan-loader
+# mesa3d itself is only needed here when it's the actual Vulkan/GL provider;
+# vendor-blob boards (BR2_PACKAGE_MESA3D_HEADERS) supply Vulkan via their own
+# ICD + vulkan-loader and are incompatible with building full mesa3d
+# alongside mesa3d-headers (see ODROID-M1 Track C notes).
+ifneq ($(BR2_PACKAGE_MESA3D_HEADERS),y)
+SDL3_DEPENDENCIES += mesa3d
+endif
 SDL3_CONF_OPTS += -DSDL_VULKAN=ON
 SDL3_CONF_OPTS += -DSDL_RENDER_VULKAN=ON
 else

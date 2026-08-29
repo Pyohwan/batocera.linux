@@ -32,6 +32,21 @@ LIBRETRO_PARALLEL_N64_PLATFORM=rpi2
 else ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_XU4),y)
 LIBRETRO_PARALLEL_N64_PLATFORM=odroid
 LIBRETRO_PARALLEL_N64_BOARD=ODROID-XU4
+else ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_RK3568),y)
+# Not in upstream's own per-board platform table (odroidm1/rk3568 is a
+# batocera-only target). Falling through to the generic "else" branch
+# below would leave $(ARCH) unset, and the upstream Makefile's fallback
+# `ARCH = $(shell uname -m)` then picks up the *build host's* arch
+# (x86_64, since this runs inside the cross-compile docker container) -
+# confirmed via a real build failure (xbyak's x86-only cpuid.h pulled in,
+# "-msse"/"-msse2" rejected by aarch64-buildroot-linux-gnu-g++). Reusing
+# the H5 platform's CPUFLAGS (-march=armv8-a+crc, cortex-a53 tuning, no
+# crypto/dotprod extensions) rather than adding new SoC-specific flags -
+# it's a strict baseline armv8-a subset with no extension-gated
+# instructions, so it's safe to run on RK3568's Cortex-A55 cores too even
+# though the tuning target isn't an exact match.
+LIBRETRO_PARALLEL_N64_EXTRA_ARGS+=WITH_DYNAREC=aarch64
+LIBRETRO_PARALLEL_N64_PLATFORM=h5
 else ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_RK3576),y)
 LIBRETRO_PARALLEL_N64_EXTRA_ARGS+=WITH_DYNAREC=aarch64
 LIBRETRO_PARALLEL_N64_PLATFORM=rk3576

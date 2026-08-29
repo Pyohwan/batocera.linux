@@ -271,6 +271,19 @@ def start_rom(args: argparse.Namespace, maxnbplayers: int, rom: Path, original_r
                         except Exception as overlay_error:
                             _logger.error("Could not initialize standalone bezel overlay: %s", overlay_error)
 
+                    # Mesa's own on-screen graph (fps/frametime) via the gallium
+                    # driver, for boards where mangohud can't be used (its EGL
+                    # hook crashes on some vendor blobs) - see the
+                    # gallium_hud_fallback default in each board's
+                    # configgen-defaults-<arch>.yml. Opt-in, not unconditional:
+                    # on a genuinely Mesa/gallium board this draws a second
+                    # overlay on top of mangohud or the generator's own fps
+                    # counter (e.g. retroarch's fps_show, dolphin's ShowFPS),
+                    # so it's only meant as a fallback for boards that can't
+                    # use those.
+                    if system.config.show_fps and system.config.get_bool('gallium_hud_fallback'):
+                        cmd.env["GALLIUM_HUD"] = "fps"
+
                     # generate the gun help
                     try:
                         default_gun_help_dir = Path("/var/run/batocera-overlays")

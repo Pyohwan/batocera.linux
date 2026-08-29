@@ -125,15 +125,15 @@ class DolphinGenerator(Generator):
         # Enable MMU
         dolphinSettings.set("Core", "MMU", str(system.config.get_bool("enable_mmu")))
 
-        # Backend - Default OpenGL
-        if system.config.get("gfxbackend") == "Vulkan":
+        # Backend - Default Vulkan (falls back to OpenGL if explicitly chosen or Vulkan unavailable)
+        if system.config.get("gfxbackend") == "OGL":
+            dolphinSettings.set("Core", "GFXBackend", "OGL")
+        else:
             dolphinSettings.set("Core", "GFXBackend", "Vulkan")
             # Check Vulkan
             if not vulkan.is_available():
                 _logger.debug("Vulkan driver is not available on the system. Using OpenGL instead.")
                 dolphinSettings.set("Core", "GFXBackend", "OGL")
-        else:
-            dolphinSettings.set("Core", "GFXBackend", "OGL")
 
         # Wiimote scanning
         dolphinSettings.set("Core", "WiimoteContinuousScanning", "True")
@@ -423,18 +423,36 @@ class DolphinGenerator(Generator):
             # use the -b 'batch' option for nicer exit
             commandArray = ["dolphin-emu", "-b", "-e", rom]
         else:
-            commandArray = ["dolphin-emu-nogui", "-e", rom]
+            # NoGUI-only build (Wayland boards - see dolphin-emu.mk): needs an
+            # explicit --platform, it doesn't probe WAYLAND_DISPLAY/DISPLAY
+            # itself like Qt does, and defaults to x11 if left unset.
+            nogui_platform = "wayland" if environ.get("WAYLAND_DISPLAY") else "x11"
+            nogui_video_backend = dolphinSettings.get("Core", "GFXBackend")
+            commandArray = ["dolphin-emu-nogui", "-p", nogui_platform, "-v", nogui_video_backend, "-e", rom]
 
         # state_slot option
         if state_filename := system.config.get('state_filename'):
             commandArray.extend(["--save_state", state_filename])
+
+        # check if we're running wayland or X11 - boards with neither (no
+        # compositor, direct KMS/DRM like odroid-m1) need eglfs instead,
+        # otherwise Qt defaults into xcb with no X server to talk to and
+        # aborts outright (same failure class as standalone duckstation-qt/
+        # pcsx2-qt, see duckstationGenerator.py/pcsx2Generator.py)
+        if environ.get("WAYLAND_DISPLAY"):
+            qt_qpa_platform = "wayland"
+        elif environ.get("DISPLAY"):
+            qt_qpa_platform = "xcb"
+        else:
+            qt_qpa_platform = "eglfs"
 
         return Command.Command(
             array=commandArray,
             env={
                 "XDG_CONFIG_HOME": CONFIGS,
                 "XDG_DATA_HOME": SAVES,
-                "XDG_CACHE_HOME": CACHE
+                "XDG_CACHE_HOME": CACHE,
+                "QT_QPA_PLATFORM": qt_qpa_platform
             }
         )
 

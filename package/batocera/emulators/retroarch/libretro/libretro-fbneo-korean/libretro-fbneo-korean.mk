@@ -3,7 +3,7 @@
 # libretro-fbneo-korean
 #
 ################################################################################
-# dsno/Zansword's Korean-patched FBNeo fork (CRC-tolerant driver patches for
+# DsNo's Korean-patched FBNeo fork (CRC-tolerant driver patches for
 # Korean-translated arcade ROMs, standard libretro-fbneo rejects these on
 # CRC32 mismatch) mirrored to a personal fork for build reproducibility -
 # the original only existed as an uncommitted working tree on a dev machine.
