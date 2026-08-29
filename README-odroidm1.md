@@ -28,7 +28,7 @@
 
 **VU8M을 보조 화면(백글래스/정보화면)으로 쓰기**: ES 메뉴의 **MULTISCREENS → BACKGLASS / INFORMATION SCREEN**에서 두 번째 비디오 출력 장치로 VU8M을 지정하면 됨(`global.videooutput2=DSI-1`) — 메인 화면(HDMI)에서 게임을 하는 동안 VU8M엔 박스아트/게임 정보 같은 백글래스 화면을 띄우는 용도. **이 값을 지정해야만** ES가 해당 출력을 실제로 구성(해상도/회전 적용)함 — 비워두면 그냥 HDMI 옆에 이어붙는 미사용 확장 화면으로만 잡히고 아무 것도 제대로 안 나옴.
 
-### 화면 회전값 설정
+### 백글래스 / 화면 회전
 
 회전은 ES 메뉴(위 MULTISCREENS 섹션의 SCREEN ROTATION)에서 설정하는 게 정석 — 여기서 고른 값이 **SHARE 파티션**(SD카드를 컴퓨터에 꽂으면 보이는 두 번째 드라이브)의 `system/batocera.conf`에 저장됨. 이 파티션을 마운트해서 직접 편집하거나, SSH로:
 ```
