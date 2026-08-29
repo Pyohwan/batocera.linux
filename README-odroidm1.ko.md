@@ -1,5 +1,7 @@
 # ODROID-M1 (bsp-odroidm1)
 
+*[English](README-odroidm1.en.md) | 한국어*
+
 ## Vanilla Batocera 대비 추가된 기능
 
 - 하드커널 자체 BSP 커널(**Linux 6.1.141**)을 씀 — 메인라인 대신 사용
