@@ -37,15 +37,19 @@ reboot
 
 **예외 — NDS 듀얼스크린**: NDS는 원래 화면이 위/아래 두 개라, HDMI+VU8M을 동시에 켜고 `melonDS` 코어를 쓰면 실제 물리 화면 두 개에 NDS의 위/아래 화면을 각각 나눠 출력할 수 있음(위 회전 이슈는 감수). 다만 melonDS는 이 보드에서 성능이 안 좋아서(GPU가속 켜도 기본 권장 코어 drastic 대비 훨씬 느림) **사실상 실사용은 힘듦** — 듀얼스크린이 정말 꼭 필요한 경우가 아니면 기본값인 drastic(단일 화면)을 쓸 것.
 
-**VU8M을 보조 화면(백글래스/정보화면)으로 쓰기**: ES 메뉴의 **MULTISCREENS → BACKGLASS / INFORMATION SCREEN**에서 두 번째 비디오 출력 장치로 VU8M을 지정할 수 있음(`global.videooutput2`) — 메인 화면(HDMI)에서 게임을 하는 동안 VU8M엔 박스아트/게임 정보 같은 백글래스 화면을 띄우는 용도.
+**VU8M을 보조 화면(백글래스/정보화면)으로 쓰기**: ES 메뉴의 **MULTISCREENS → BACKGLASS / INFORMATION SCREEN**에서 두 번째 비디오 출력 장치로 VU8M을 지정하면 됨(`global.videooutput2=DSI-1`) — 메인 화면(HDMI)에서 게임을 하는 동안 VU8M엔 박스아트/게임 정보 같은 백글래스 화면을 띄우는 용도. **이 값을 지정해야만** ES가 해당 출력을 실제로 구성(해상도/회전 적용)함 — 비워두면 그냥 HDMI 옆에 이어붙는 미사용 확장 화면으로만 잡히고 아무 것도 제대로 안 나옴.
 
 ### 화면 회전
 
-자동 감지와 무관하게 특정 회전값을 강제하려면 `batocera-boot.conf`에 추가:
+회전은 ES 메뉴(위 MULTISCREENS 섹션)에서 설정하는 게 정석 — 여기서 고른 값이 `batocera.conf`(userdata, 재부팅해도 유지됨)에 저장됨. 직접 SSH로 설정하려면:
 ```
-display.rotate=<N>
+batocera-settings-set global.videooutput2 DSI-1        # VU8M을 2번째 화면으로
+batocera-settings-set display.rotate2.DSI-1 3          # VU8M 회전값 (실측: 270도가 정방향)
+reboot
 ```
-`<N>`은 `0`(정상), `1`(90도), `2`(180도), `3`(270도). 커넥터별로 다르게 주고 싶으면 `display.rotate.<커넥터이름>=<N>`. 이 설정은 EmulationStation뿐 아니라 **부팅 스플래시 화면에도 그대로 적용됨**(같은 파일을 읽음).
+메인 화면 회전은 커넥터별로 `display.rotate.<커넥터이름>=<N>`(예: `display.rotate.HDMI-A-1`), 없으면 전역 `display.rotate=<N>`. `<N>`은 `0`(정상), `1`(90도), `2`(180도), `3`(270도).
+
+부팅 스플래시(ES가 뜨기 전 최초 로고 화면)도 메인 화면 회전값은 자동으로 따라감 — `batocera.conf`의 `display.rotate`/`display.rotate.<커넥터>`가 재부팅 시점에 `batocera-boot.conf`로 자동 동기화되고 스플래시가 그걸 읽음(vanilla 메커니즘, 별도 설정 불필요). 다만 이건 메인 화면 한정이고, VU8M을 2번째 화면(backglass)으로 쓸 때의 `display.rotate2`는 스플래시엔 적용 안 됨 — 애초에 스플래시는 2번째 화면엔 아무것도 그리지 않으니 상관없음.
 
 ## 시스템별 성능 측정 결과 및 권장 코어/API
 
