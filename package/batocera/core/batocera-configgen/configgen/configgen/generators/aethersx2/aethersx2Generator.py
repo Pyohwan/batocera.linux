@@ -11,14 +11,10 @@ from ...controller import generate_sdl_game_controller_config
 from ..Generator import Generator
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
 
-    from ...config import SystemConfig
     from ...controller import Controllers
     from ...Emulator import Emulator
-    from ...gun import Guns
-    from ...input import Input
-    from ...types import DeviceInfoMapping, HotkeysContext, Resolution
+    from ...types import HotkeysContext
 
 _AETHERSX2_BIN: Final = Path("/usr/aethersx2/aethersx2")
 _AETHERSX2_LIBS: Final = Path("/usr/aethersx2/libs")
