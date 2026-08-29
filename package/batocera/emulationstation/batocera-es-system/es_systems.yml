@@ -934,7 +934,6 @@ fbneo:
     libretro:
       fbalpha:  { requireAnyOf: [BR2_PACKAGE_LIBRETRO_FBALPHA]  }
       fbneo:    { requireAnyOf: [BR2_PACKAGE_LIBRETRO_FBNEO]    }
-      fbneo_korean: { requireAnyOf: [BR2_PACKAGE_LIBRETRO_FBNEO_KOREAN] }
     fba2x:
       fba2x:    { requireAnyOf: [BR2_PACKAGE_PIFBA] }
   comment_en: |
@@ -2867,7 +2866,6 @@ model3:
   emulators:
     supermodel:
       supermodel:        { requireAnyOf: [BR2_PACKAGE_SUPERMODEL] }
-      supermodel-legacy: { requireAnyOf: [BR2_PACKAGE_SUPERMODEL_LEGACY] }
 
   comment_en: |
     ## SEGA MODEL 3 IMPORTANT INFO ##
@@ -5836,7 +5834,7 @@ ps4:
   manufacturer: Sony
   release: 2013
   hardware: console
-  extensions: [ps4]
+  extensions: [ps4, zar]
   emulators:
     shadps4:
       shadps4: { requireAnyOf: [BR2_PACKAGE_SHADPS4] }
@@ -5859,6 +5857,9 @@ ps4:
 
     This .ps4 extension acts as a launcher entry and allows the game to appear correctly in the frontend.
     The games eboot.bin launcher file should be in the root of the directory called .ps4 or alongside the .ps4 file.
+
+    ZArchive files are also supported, copy the .zar file directly to: /userdata/roms/ps4
+    Example: /userdata/roms/ps4/Bloodborne.zar
 
     DLC content will be stored in: /userdata/roms/ps4/DLC
 
