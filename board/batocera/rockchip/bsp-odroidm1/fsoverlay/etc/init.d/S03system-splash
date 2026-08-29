@@ -33,9 +33,20 @@ do_start () {
     # Resolve video rotation first so we know how to crop the image
     V_BOARD_MODEL=$(batocera-model)
     video_rotation=""
+    CONFIG_INI="/boot/config.ini"
     BOOT_CONF="/boot/batocera-boot.conf"
 
-    if [ -f "${BOOT_CONF}" ]; then
+    # Checked first, ahead of batocera-boot.conf below: config.ini is where
+    # VU8M itself gets enabled (overlays=), so anyone setting up VU8M can do
+    # the whole thing (enable + rotate) in one PC-visible file on the boot
+    # partition instead of also having to touch batocera-boot.conf.
+    if [ -f "${CONFIG_INI}" ]; then
+        video_rotation=$(grep -E '^[[:space:]]*display\.rotate=' "${CONFIG_INI}" | tail -1 | cut -d'=' -f2- | tr -d '"'"'"' \t')
+    fi
+
+    if [ -n "${video_rotation}" ]; then
+        echo "Rotation from config.ini: [${video_rotation}]"
+    elif [ -f "${BOOT_CONF}" ]; then
         specific_key=$(awk -F'=' '/^[[:space:]]*display\.rotate\./{print $1; exit}' "${BOOT_CONF}" | tr -d '[:space:]')
         if [ -n "${specific_key}" ]; then
             video_rotation=$(/usr/bin/batocera-settings-get -f "${BOOT_CONF}" "${specific_key}")
