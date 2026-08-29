@@ -44,7 +44,7 @@ reboot
 회전은 ES 메뉴(위 MULTISCREENS 섹션)에서 설정하는 게 정석 — 여기서 고른 값이 `batocera.conf`(userdata, 재부팅해도 유지됨)에 저장됨. 직접 SSH로 설정하려면:
 ```
 batocera-settings-set global.videooutput2 DSI-1        # VU8M을 2번째 화면으로
-batocera-settings-set display.rotate2.DSI-1 3          # VU8M 회전값 (실측: 270도가 정방향)
+batocera-settings-set display.rotate2.DSI-1 3          # VU8M 회전값 (개체마다 실제 장착 방향에 따라 다를 수 있음)
 reboot
 ```
 메인 화면 회전은 커넥터별로 `display.rotate.<커넥터이름>=<N>`(예: `display.rotate.HDMI-A-1`), 없으면 전역 `display.rotate=<N>`. `<N>`은 `0`(정상), `1`(90도), `2`(180도), `3`(270도).
