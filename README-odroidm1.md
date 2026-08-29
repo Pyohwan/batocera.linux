@@ -43,7 +43,7 @@
 batocera-settings-set global.videooutput2 DSI-1   # VU8M을 2번째 화면(백글래스)으로 지정
 batocera-settings-set display.rotate2.DSI-1 3      # 그 화면의 회전값
 ```
-설정 후 **반드시 재부팅**해야 적용됨(EmulationStation이 시작 시점에만 출력/회전을 구성함):
+설정 후 **재부팅**해야 적용됨(EmulationStation이 시작 시점에만 출력/회전을 구성함):
 ```
 reboot
 ```
