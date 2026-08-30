@@ -422,7 +422,55 @@ void renderImage(SDL_Renderer* renderer, SDL_Texture* texture, SDL_Rect boundary
     SDL_RenderCopy(renderer, texture, NULL, &dstrect);
 }
 
-SDL_Texture* createTextTexture(SDL_Renderer* renderer, TTF_Font* font, const std::string& text, SDL_Color color, int wrapWidth) {
+// Decodes a UTF-8 string into Unicode codepoints. Malformed sequences are
+// skipped rather than aborting, matching how TTF_RenderUTF8 tolerates bad
+// input too - this is only used for glyph-coverage checks, not display.
+static std::vector<Uint32> utf8ToCodepoints(const std::string& s) {
+    std::vector<Uint32> out;
+    size_t i = 0;
+    while (i < s.size()) {
+        unsigned char c = (unsigned char)s[i];
+        Uint32 cp = 0;
+        int extra = 0;
+        if ((c & 0x80) == 0x00)      { cp = c;        extra = 0; }
+        else if ((c & 0xE0) == 0xC0) { cp = c & 0x1F; extra = 1; }
+        else if ((c & 0xF0) == 0xE0) { cp = c & 0x0F; extra = 2; }
+        else if ((c & 0xF8) == 0xF0) { cp = c & 0x07; extra = 3; }
+        else { i++; continue; } // invalid lead byte, skip it
+        if (i + extra >= s.size()) break;
+        bool valid = true;
+        for (int k = 1; k <= extra; k++) {
+            unsigned char cc = (unsigned char)s[i + k];
+            if ((cc & 0xC0) != 0x80) { valid = false; break; }
+            cp = (cp << 6) | (cc & 0x3F);
+        }
+        if (valid) out.push_back(cp);
+        i += extra + 1;
+    }
+    return out;
+}
+
+// SDL2_ttf has no per-glyph fallback chain (that's an SDL3_ttf-only
+// feature) - a single fixed font picked once at startup renders every
+// string for the rest of the session, regardless of what that string
+// actually contains. Prepending a CJK font to cover Korean would silently
+// regress any other script it covers only partially - e.g. Noto Sans KR
+// has just 66 Cyrillic codepoints vs DejaVu Sans's full 256, so Cyrillic
+// game titles would start rendering as missing-glyph boxes to fix Korean
+// ones. Check per string instead: keep using `primary` unless it's
+// missing a glyph this specific text needs, only then fall back.
+static TTF_Font* pickFontForText(TTF_Font* primary, TTF_Font* fallback, const std::string& text) {
+    if (!fallback) return primary;
+    if (!primary) return fallback;
+    for (Uint32 cp : utf8ToCodepoints(text)) {
+        if (cp < 0x20) continue; // control chars, nothing to render anyway
+        if (!TTF_GlyphIsProvided32(primary, cp)) return fallback;
+    }
+    return primary;
+}
+
+SDL_Texture* createTextTexture(SDL_Renderer* renderer, TTF_Font* font, const std::string& text, SDL_Color color, int wrapWidth, TTF_Font* fallbackFont = nullptr) {
+    font = pickFontForText(font, fallbackFont, text);
     if (!font || text.empty()) return nullptr;
     SDL_Surface* surface = TTF_RenderUTF8_Blended_Wrapped(font, text.c_str(), color, wrapWidth);
     if (!surface) return nullptr;
@@ -557,17 +605,8 @@ int main(int argc, char* argv[]) {
     if (TTF_Init() < 0) return 1;
 
     // Separate Bold (Headers) from Regular weight (Descriptions)
-    // Noto Sans KR checked first in both lists below: it's a variable font
-    // with full Latin+CJK coverage in one file (Google Noto design goal),
-    // so using it as the primary choice (not just a Korean-only fallback)
-    // renders both scripts consistently without per-glyph font switching,
-    // which SDL_ttf/TTF_RenderUTF8_Blended_Wrapped can't do anyway (one
-    // font per call). Without this, Korean text (game titles, backglass
-    // metadata) silently rendered as missing-glyph boxes - DejaVu/
-    // Liberation below have no CJK glyphs at all.
     std::string font_path_header = "";
     std::vector<std::string> header_font_candidates = {
-        "/usr/share/fonts/truetype/noto/NotoSansKR-VF.ttf",
         "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
         "/usr/share/fonts/dejavu/DejaVuSans.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -583,7 +622,6 @@ int main(int argc, char* argv[]) {
 
     std::string font_path_desc = "";
     std::vector<std::string> desc_font_candidates = {
-        "/usr/share/fonts/truetype/noto/NotoSansKR-VF.ttf",
         "/usr/share/fonts/dejavu/DejaVuSans.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "/usr/share/fonts/TTF/DejaVuSans.ttf",
@@ -614,6 +652,23 @@ int main(int argc, char* argv[]) {
     }
     if (!font_path_desc.empty()) {
         font_desc = TTF_OpenFont(font_path_desc.c_str(), desc_font_size);
+    }
+
+    // Fallback-only font for scripts the primary DejaVu/Liberation choice
+    // above doesn't cover (Korean and other CJK text was rendering as
+    // missing-glyph boxes) - picked per string by pickFontForText(), never
+    // used as the primary choice, so this can't regress any script the
+    // primary font already covers fully (see pickFontForText's comment).
+    // retroarch's Config.in already selects BR2_PACKAGE_NOTO_CJK_FONTS,
+    // which installs this file on any board that builds retroarch (i.e.
+    // virtually all of them) - nullptr (skipped) if somehow absent.
+    const char* FALLBACK_FONT_PATH = "/usr/share/fonts/truetype/noto/NotoSansKR-VF.ttf";
+    TTF_Font* font_header_fallback = nullptr;
+    TTF_Font* font_desc_fallback = nullptr;
+    if (FILE* f = fopen(FALLBACK_FONT_PATH, "r")) {
+        fclose(f);
+        font_header_fallback = TTF_OpenFont(FALLBACK_FONT_PATH, header_font_size);
+        font_desc_fallback = TTF_OpenFont(FALLBACK_FONT_PATH, desc_font_size);
     }
 
     restoreActiveState();
@@ -695,11 +750,11 @@ int main(int argc, char* argv[]) {
             if (!game_image_path.empty()) tex_game_image = IMG_LoadTexture_at_resolution(renderer, game_image_path, winW, winH);
             if (!game_marquee_path.empty()) tex_game_marquee = IMG_LoadTexture_at_resolution(renderer, game_marquee_path, winW, winH);
 
-            if (!sys_fullname.empty()) tex_sys_fullname = createTextTexture(renderer, font_header, sys_fullname, whiteColor, (int)(winW * 0.9f));
-            if (!game_name.empty()) tex_game_name = createTextTexture(renderer, font_header, game_name, whiteColor, (int)(winW * 0.9f));
+            if (!sys_fullname.empty()) tex_sys_fullname = createTextTexture(renderer, font_header, sys_fullname, whiteColor, (int)(winW * 0.9f), font_header_fallback);
+            if (!game_name.empty()) tex_game_name = createTextTexture(renderer, font_header, game_name, whiteColor, (int)(winW * 0.9f), font_header_fallback);
             
             int desc_wrap_width = (winW >= winH) ? (int)(winW * 0.4f * 0.90f) : (int)(winW * 0.80f);
-            if (!game_desc.empty()) tex_game_desc = createTextTexture(renderer, font_desc, game_desc, whiteColor, desc_wrap_width);
+            if (!game_desc.empty()) tex_game_desc = createTextTexture(renderer, font_desc, game_desc, whiteColor, desc_wrap_width, font_desc_fallback);
         }
 
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
