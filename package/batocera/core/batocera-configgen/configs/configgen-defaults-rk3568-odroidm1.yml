@@ -1,0 +1,110 @@
+default:
+  emulator:
+  core:
+  options:
+    gallium_hud_fallback: true # this board's vendor Mali blob doesn't
+    # implement the EGL hooks mangohud needs (see n64/dreamcast below), so
+    # emulatorlauncher.py falls back to Mesa's own GALLIUM_HUD debug var
+    # for boards that opt in here (get_bool default is False, so other
+    # boards get nothing unless they opt in too). On genuinely Mesa/gallium
+    # boards this would draw a second overlay on top of mangohud or the
+    # emulator's own fps counter, so it's opt-in rather than unconditional.
+# gamecube/nds/wii/fmtowns/psx/flash/model3/model2 below are copied
+# verbatim from the shared configgen-defaults-rk3568.yml - only one
+# arch-defaults file gets loaded per board, so there's no way to share
+# these without duplicating them. Kept manually in sync (same convention
+# as board/batocera/rockchip/bsp-odroidm1/patches/ffmpeg/patches-source.txt);
+# if the shared file's entries for these systems ever change, this file
+# needs the same edit or it silently falls behind.
+# gamecube/wii diverge from the shared file on purpose: standalone dolphin
+# (emulator: dolphin) is what's actually benchmarked/recommended on this
+# board (libretro-dolphin's OpenGL path is the one that breaks under
+# Wayland - see project_odroid_retro.md), not the shared file's
+# libretro-dolphin default. dolphinGenerator.py already defaults to
+# Vulkan unless gfxbackend=OGL is explicitly set, so no extra option
+# needed here for that part.
+gamecube:
+  emulator: dolphin
+  core:     dolphin
+nds:
+  emulator: drastic
+  core:     drastic
+wii:
+  emulator: dolphin
+  core:     dolphin
+fmtowns:
+  emulator: libretro
+  core:     mame
+psx:
+  options:
+    hud_support: false # duckstation doesn't like it on n2+
+n64:
+  emulator: mupen64plus
+  core:     rice # standalone mupen64plus has no Vulkan renderer on this
+  # GPU class (GLES+Vulkan only, no desktop GL) - rice is the
+  # best-performing plugin benchmarked here (glide64mk2/gliden64 both
+  # slower). The shared configgen-defaults.yml default (glide64mk2) was
+  # never actually overridden by the "auto order" fix mentioned in
+  # project_odroid_retro.md - that fix reordered es_systems.yml's core
+  # listing, which has no effect on which core ES marks as "auto": that's
+  # driven by comparing against this emulator/core pair (see
+  # python-src/batocera-es-system's registry.py get_systems_metadata),
+  # not list order. Confirmed live: without this, auto silently ran
+  # glide64mk2 the whole time.
+  options:
+    hud_support: false # mupen64plus standalone + mangohud's EGL hooking:
+    # the Mali blob doesn't implement the EGL extension function(s)
+    # mangohud's inject_egl looks for, so SDL_CreateWindow fails outright
+    # ("Can't load EGL/GL library on window creation") - audio plays,
+    # video never comes up. hud_support default is true globally
+    # (configgen-defaults.yml) with no n64-specific override anywhere,
+    # so this bit ODROID-M1 (Mali-G52 blob) with no in-game FPS counter as
+    # the only symptom users could point to. Confirmed on both g13p0 and
+    # g24p0 Mali blobs. Moved here from the shared configgen-defaults-rk3568.yml
+    # since other rk3568-family boards (mainline kernel + Panfrost) don't
+    # have this vendor-blob-specific mangohud EGL hook failure.
+dreamcast:
+  emulator: flycast
+  core:     flycast # standalone flycast, not the shared file's
+  # libretro-flycast default - matches the benchmarked recommendation
+  # (all 4 combinations measured near-identical perf, but standalone
+  # avoids the extra libretro indirection). flycastGenerator.py's own
+  # renderer default is OpenGL (unlike dolphin/ppsspp, which both
+  # default to Vulkan already) - flycast_renderer=4 forces Vulkan
+  # (pvr.rend 4/5 in flycast's own config, see flycastGenerator.py).
+  options:
+    flycast_renderer: "4"
+    hud_support: false # same mangohud+Mali blob EGL crash as n64 above,
+    # confirmed on standalone flycast (2026-08-07): SDL_CreateWindow fails
+    # ("Can't load EGL/GL library on window creation") when mangohud wraps it.
+naomi:
+  options:
+    hud_support: false # flycast core, same issue as dreamcast above
+atomiswave:
+  options:
+    hud_support: false # flycast core, same issue as dreamcast above
+systemsp:
+  options:
+    hud_support: false # flycast core, same issue as dreamcast above
+# ps2 is the one entry that genuinely differs from the shared file (not
+# just a copy): the shared file's libretro-play default and pcsx2 both
+# hit a Mali blob GPU fault (DATA_INVALID_FAULT, confirmed live via
+# dmesg - "GPU fault 0x5b from job slot 0" - the game visibly hangs) that
+# AetherSX2 avoids (older GS command pattern doesn't trigger it) - see
+# project_odroid_retro.md's "Mali G52 blob 구조적 한계" section. pcsx2 is
+# kept installed/selectable in ES as a fallback for games/scenarios where
+# it happens not to fault, but must never be the auto default - it was,
+# until this fix (2026-08-28, caught live: auto silently launched pcsx2,
+# which promptly hung on a real GPU fault).
+ps2:
+  emulator: aethersx2
+  core:     aethersx2
+flash:
+  emulator: lightspark
+  core:     lightspark
+model3:
+  emulator: supermodel
+  core:     supermodel
+model2:
+  emulator: libretro
+  core:     mame

@@ -1,0 +1,255 @@
+include batocera-board.common
+
+# Target definition
+BR2_aarch64=y
+BR2_cortex_a55=y
+BR2_ARM_FPU_NEON_FP_ARMV8=y
+BR2_PACKAGE_BATOCERA_TARGET_RK3568=y
+# This dedicated target's own board identity, distinct from
+# BR2_PACKAGE_UBOOT_ODROID_M1 (also set by the shared 11-board
+# batocera-rk3568.board target, which builds an odroid-m1 image variant
+# too - not a valid "is this our dedicated target" proxy).
+BR2_PACKAGE_BATOCERA_TARGET_BSP_ODROIDM1=y
+BR2_TARGET_OPTIMIZATION="-pipe -fsigned-char"
+BR2_TARGET_GENERIC_GETTY_BAUDRATE_115200=y
+# NOT rk3568/patches wholesale: most of its patches (uboot, etc.) target
+# other boards on that shared target (e.g. Anbernic RGxx3 fixes) and never
+# match anything here - BR2_GLOBAL_PATCH_DIR only applies a <dir>/<pkg>/
+# patch to a package whose name matches <pkg> exactly, so they'd just be
+# dead weight, not silently wrong. (An earlier version of this comment
+# claimed the shared target's uboot patches were relevant to us too and
+# copied them into bsp-odroidm1/patches/uboot/ - they weren't. Removed.)
+# The ffmpeg/mpv patches ARE genuinely useful here though, and 4 of the 5
+# are byte-identical copies kept manually in sync (see
+# bsp-odroidm1/patches/ffmpeg/patches-source.txt) - only
+# 0002-wip-hevc-Add-support-for-sps-st-rps-control.patch is excluded,
+# since it needs newer V4L2 UAPI structs only present in the shared
+# target's mainline 7.0.11 kernel headers, not our BSP fork.
+BR2_GLOBAL_PATCH_DIR="$(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/patches $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/patches $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/bsp-odroidm1/patches"
+BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/fsoverlay $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/fsoverlay $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/rk3568/fsoverlay $(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/bsp-odroidm1/fsoverlay"
+
+# Kernel - our hardkernel BSP fork (HDMI+DSI dual livelock fix), not mainline
+BR2_LINUX_KERNEL=y
+BR2_LINUX_KERNEL_CUSTOM_GIT=y
+BR2_LINUX_KERNEL_CUSTOM_REPO_URL="https://github.com/Pyohwan/linux.git"
+BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION="fix-hdmi-dsi-dual-livelock"
+BR2_KERNEL_HEADERS_6_1=y
+BR2_LINUX_KERNEL_USE_CUSTOM_CONFIG=y
+BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="$(BR2_EXTERNAL_BATOCERA_PATH)/board/batocera/rockchip/bsp-odroidm1/linux-defconfig.config"
+BR2_LINUX_KERNEL_NEEDS_HOST_OPENSSL=y
+
+# Build the DTB from the kernel sources - in-tree DTS, odroid-m1 only
+BR2_LINUX_KERNEL_DTS_SUPPORT=y
+BR2_LINUX_KERNEL_INTREE_DTS_NAME="rockchip/rk3568-odroid-m1"
+
+# Override the RK3568-family default board list (11 boards) - we only build odroid-m1
+BR2_TARGET_BATOCERA_IMAGES_DEFINITIONS=y
+BR2_TARGET_BATOCERA_IMAGES="rockchip/bsp-odroidm1"
+
+# Bootloader
+BR2_PACKAGE_HOST_DOSFSTOOLS=y
+BR2_PACKAGE_UBOOT_ODROID_M1=y
+
+# fdtoverlay (host tool) - used by create-boot-script.sh to bake VU8M/i2c/spi overlays into the DTB
+BR2_PACKAGE_HOST_DTC=y
+
+# System
+BR2_PACKAGE_BATOCERA_KODI21=y
+BR2_TARGET_ROOTFS_SQUASHFS4_ZSTD=y
+
+# Host-machine parallelism cap - BR2_JLEVEL=0 (auto = nproc+1 = 17 on the
+# LG gram build host, 16-core/15GB) OOM-killed the Claude Code process
+# itself (confirmed via journalctl: "ptyxis-spawn-...scope: A process of
+# this unit has been killed by the OOM killer") while 17-way parallel g++
+# was compiling MAME/OpenCV4/Kodi - large individual translation units,
+# not just many small ones, so wide parallelism multiplies peak per-TU
+# memory instead of just wall-clock speed. odroid-m1-panfrost hit the same
+# class of problem with LLVM+Mesa3D and capped at 4 (later loosened to 8
+# once profiling showed headroom) - this board never got the equivalent
+# cap despite also building large C++ codebases.
+BR2_JLEVEL=8
+
+# GPU - Mali-G52 blob (hardkernel). The kernel also builds Panfrost as an
+# unused module (matches the real device: loaded, refcount 0) but we use
+# the proprietary blob, matching what's verified working on hardware.
+BR2_PACKAGE_MALI_G52_ODROIDM1=y
+
+# No compositor (labwc/Wayland): the vendor Mali blob's Wayland-client EGL
+# platform is broken (confirmed live on hardware - eglGetPlatformDisplayEXT
+# succeeds but eglInitialize always fails with EGL_NOT_INITIALIZED, on both
+# the g13p0 blob we ship and a g24p0 blob tested as a swap-in candidate).
+# The same blob's GBM/DRM platform EGL works perfectly (labwc's own
+# server-side rendering used it without issue). Falling back to no
+# compositor makes batocera-emulationstation launch ES directly instead of
+# via labwc-launch (see batocera-emulationstation.mk), and switches
+# batocera-resolution's script type to "drm" (BR2_PACKAGE_LIBDRM fallback,
+# same as rk3326) - single active output selected via raw DRM connector
+# enumeration instead of wlr-randr, rotation falls back to ES's own
+# --screenrotate (emulationstation-standalone already branches on
+# supportSystemRotation, which batocera-resolution.drm reports as
+# unsupported). Simultaneous dual-output (HDMI+VU8M) is lost, but not
+# needed - single active output at a time is enough.
+# Track C reintroduces labwc, reversing A/B's GBM/KMSDRM-direct decision
+# above: gate 1 (g29p1 blob accepted by vendor kbase, 2026-08-12) passed,
+# and blob Vulkan's only display path is VK_KHR_display, which PanVK also
+# has and still fails to create a surface with on this board (B, 2026-08-
+# 11) - Wayland is the only Vulkan output path left to try. See
+# project_odroid_retro_track_c_v3.md for the full gate 1/2 rationale.
+BR2_PACKAGE_BATOCERA_WAYLAND_LABWC=y
+
+# libcurl was previously built with brotli support because BR2_PACKAGE_BROTLI
+# got pulled in transitively via webkitgtk -> woff2 -> brotli, and webkitgtk
+# was only reachable through the GTK backend that Wayland/labwc provided.
+# Removing labwc deselects that whole chain, but libcurl.so (unrebuilt,
+# still the old binary) keeps a hard runtime DT_NEEDED on libbrotlidec.so.1 -
+# losing the package broke curl/smbd/nmbd/emulationstation at runtime
+# (confirmed live: "error while loading shared libraries: libbrotlidec.so.1").
+# Keep brotli selected explicitly so that dependency stays satisfied.
+BR2_PACKAGE_BROTLI=y
+
+# GameCube/Wii core - package/batocera/core/batocera-system/Config.in only
+# auto-selects this for x86_64/RK3588/S922X/RPi5-class targets (stronger
+# single-thread CPU than our A55), not RK3568 - forcing it on anyway since
+# we already have GC ROMs migrated and want to try it. Known to be
+# CPU-bound even on TOPST D3-G's stronger Cortex-A72 (~18fps).
+BR2_PACKAGE_LIBRETRO_DOLPHIN=y
+
+# FBNeo core built from DsNo's Korean-patched fork (CRC-tolerant
+# driver patches for Korean-translated arcade ROMs, which the standard
+# libretro-fbneo core rejects on CRC32 mismatch) - registered as an
+# alternate "fbneo_korean" core alongside the standard one, same fbneo
+# system/ROM folder. See package/batocera/emulators/retroarch/libretro/
+# libretro-fbneo-korean/.
+BR2_PACKAGE_LIBRETRO_FBNEO_KOREAN=y
+
+# batocera-system/Config.in's default select list for beetle-saturn only
+# covers a fixed board whitelist (x86/rk3588/qcs6490/sm8xxx/...) that
+# doesn't include our RK3568 family, so force it on directly - alternate
+# Saturn core for comparison against yabasanshiro (mednafen-accuracy
+# tradeoff, known slow on this CPU from earlier live testing).
+BR2_PACKAGE_LIBRETRO_BEETLE_SATURN=y
+
+# Saturn: tried enabling kronos here (upstream only selects it for x86,
+# but its .mk already supports several ARM+GLES boards via FORCE_GLES=1 -
+# added an RK3568 branch reusing the odroid-c4 GLES platform, see
+# libretro-kronos.mk). Blocked for now: LIBRETRO_KRONOS_DEPENDENCIES pulls
+# in full BR2_PACKAGE_MESA3D unconditionally, which buildroot refuses to
+# combine with BR2_PACKAGE_MESA3D_HEADERS (mesa3d-headers.mk hard-stops:
+# "mesa3d-headers enabled, but mesa3d enabled too") - that's the headers-
+# only package our vendor blob setup (mali-g52-odroidm1.mk) depends on
+# instead of full Mesa. Needs kronos.mk patched to not require full mesa3d
+# on this board (unclear yet whether it actually needs anything beyond
+# headers for the FORCE_GLES path) before this can be turned back on.
+# BR2_PACKAGE_LIBRETRO_KRONOS=y
+
+# NDS: upstream only selects libretro-melonds-ds when BR2_PACKAGE_
+# BATOCERA_XWAYLAND is set, which is off on this board (see the Wayland-
+# client EGL note above) - that gate has nothing to do with melonds-ds's
+# actual dependencies (cmake, libpcap, libstdc++ only), so force it on.
+# The older libretro-melonds (already built by default) is confirmed dead
+# on this blob (requires desktop GL, board only has GLES) - melonds-ds has
+# a Software render mode that doesn't need GL at all, worth trying.
+BR2_PACKAGE_LIBRETRO_MELONDS_DS=y
+
+# Track C (g29p1 Vulkan blob + Wayland, see project memory
+# project_odroid_retro_track_c_v3.md) systems/cores.
+#
+# BR2_PACKAGE_BATOCERA_VULKAN is needed here despite this board's Vulkan
+# coming from the g29p1 blob itself (mali.json ICD written by hand once
+# the blob is swapped in), not a buildroot-selectable Mesa driver -
+# initially left off on the (correct as far as it went) reasoning that
+# there was "nothing to select at the Kconfig level" for the driver, but
+# that option gates more than just Mesa Vulkan driver selection: it's
+# also what registers PPSSPP's gfxbackend.ppsspp.emulator.yml (the
+# Graphics API/Vulkan choice in ES's own PSP options menu never appeared
+# without it - confirmed live, ES only showed OpenGL) and selects
+# VKQUAKE/VKQUAKE2/VKQUAKE3/QT6BASE_VULKAN. Confirmed safe on this board:
+# every BR2_PACKAGE_MESA3D_VULKAN_DRIVER_* select it pulls in is itself
+# gated behind other targets (X86/RPi/PANFROST_MESA3D/FREEDRENO_MESA3D)
+# that don't match rk3568/bsp-odroidm1, so enabling this adds only the
+# generic vulkan-tools/spirv-tools/shaderc packages plus the above
+# Vulkan-native ports/UI options, no conflicting Mesa driver.
+BR2_PACKAGE_BATOCERA_VULKAN=y
+#
+# Side effect discovered later (2026-08-23, v15 build): this hard-selects
+# BR2_PACKAGE_GST1_PLUGINS_BAD_PLUGIN_VULKAN (batocera-system/Config.in) -
+# a `select`, so it can't be undone from a defconfig. That GST plugin needs
+# a host shader compiler we don't have; see the actual fix (gated on a
+# nonexistent BR2_PACKAGE_HOST_SHADERC) in buildroot/package/gstreamer1/
+# gst1-plugins-bad/gst1-plugins-bad.mk (our buildroot fork, not upstream).
+#
+# The g29p1 blob's Vulkan ICD only implements VK_KHR_display (bare DRM, no
+# compositor) among windowing-system surface extensions - confirmed live
+# via vulkaninfo's Instance Extensions list, no VK_KHR_wayland_surface at
+# all. Without this layer, every Vulkan app's own surface/device creation
+# for a Wayland window fails outright (confirmed live: PPSSPP's SDL2
+# window creation succeeded once SDL2 itself got Vulkan support enabled,
+# but PPSSPP's own Vulkan backend init then failed and silently fell back
+# to another backend) even though vulkaninfo enumerates the GPU fine.
+# ROCKNIX carries the exact same fix for the same blob/board family
+# (RK3566/g29p1) - see package/batocera/gpu/vulkan/vulkan-wsi-layer/ for
+# the full writeup and version pin.
+BR2_PACKAGE_VULKAN_WSI_LAYER=y
+#
+# These system/core enables are GPU-driver-independent and were already
+# confirmed to build on B (cherry-picked selects only, not the
+# PanVK-specific lines):
+#
+# PCSX2 (PS2) - never tested on this board before B. Needs BR2_PACKAGE_
+# HAS_LIBGL fixed above (see vkquake2/pcsx2 desktop-GL commit) to avoid
+# pulling in wxwidgets/libglu on this GLES-only board.
+BR2_PACKAGE_PCSX2=y
+
+# AetherSX2 (PS2) - vendored prebuilt aarch64 binary (ROCKNIX), uses the
+# older/pre-mainline GS renderer that survives on this blob (bmdhacks
+# pcsx2's newer GS trips DATA_INVALID_FAULT under load - see project
+# history for the cross-reproduction that pinned this down). This line
+# was missing entirely (package existed in the tree but was never
+# actually enabled here), so the ps2 system had no valid emulator and
+# was silently absent from ES's system list.
+BR2_PACKAGE_AETHERSX2=y
+
+# Dolphin standalone (GameCube/Wii) - distinct from libretro-dolphin above
+# (GL only). Has its own Vulkan gfxbackend option once g29p1 is in.
+BR2_PACKAGE_DOLPHIN_EMU=y
+
+# parallel-n64 core, needs the RK3568 arch branch fix (see
+# libretro-parallel-n64.mk commit) to cross-compile aarch64. NOTE: despite
+# the core's name, its ParaLLEl-RDP Vulkan renderer is gated to AMD64 only
+# upstream (confirmed live: /proc/PID/maps never loads libvulkan.so here,
+# and cross-checked against ROCKNIX's own libretro packaging, which gates
+# it the same way) - this core only ever runs its GL path on ARM. N64 is
+# already well covered by mupen64plus-next (GLES) on this board instead.
+BR2_PACKAGE_LIBRETRO_PARALLEL_N64=y
+
+# libretro Azahar (3DS) - no 3DS system was buildable on this board before.
+BR2_PACKAGE_LIBRETRO_AZAHAR=y
+
+# libretro PPSSPP core - distinct build from the standalone PPSSPP (already
+# on by default). Standalone's own Vulkan gfxbackend needs the RK3568
+# allowlist fix (see ppsspp.mk ARM_NO_VULKAN commit).
+BR2_PACKAGE_LIBRETRO_PPSSPP=y
+
+# Dropped on B, not re-added here: libretro-flycastvl (stale fork, no ARM
+# platform wiring), libretro-ps2/libretro-play (CMake arch-detection
+# failure / not in es_systems.yml). See B's commits 04c0e462f6/5f1cf74e76.
+
+# standalone duckstation - defaults on for GLES3 boards via
+# batocera-system/Config.in's unconditional select, which a plain
+# "is not set" here can't override. Same class of mesa3d/blob Kconfig
+# conflict as Saturn kronos above once BATOCERA_VULKAN is on (its .mk
+# needs full BR2_PACKAGE_MESA3D, which hard-conflicts with this board's
+# BR2_PACKAGE_MESA3D_HEADERS-only blob setup) - fixed at the real source
+# with a depends-on guard in duckstation/Config.in itself (Kconfig drops
+# a select whose target's depends-on is unmet). Also already abandoned
+# on A/B for a separate, unrelated reason (Qt/eglfs can't host
+# duckstation-qt's multi-widget window structure without a compositor -
+# "Failed to get window info from widget", see project memory) - PSX is
+# already covered by libretro swanstation (the actual recommended core,
+# 58fps+ software-rendered).
+
+# Firmware
+BR2_PACKAGE_FIRMWARE_ARMBIAN=y
+
+# choices can be put in _defconfig files only
+BR2_PACKAGE_BATOCERA_SPLASH_MPV=y

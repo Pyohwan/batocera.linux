@@ -47,6 +47,8 @@ define UBOOT_ODROID_M1_BUILD_CMDS
     $(TARGET_MAKE_ENV) $(MAKE) -C $(@D) $(UBOOT_ODROID_M1_MAKE_OPTS)
 endef
 
+# The combined idbloader+u-boot.itb image (correct offsets baked in by
+# U-Boot's own build) - see BUILD-NOTES.md.
 define UBOOT_ODROID_M1_INSTALL_IMAGES_CMDS
     mkdir -p $(BINARIES_DIR)/uboot-odroid-m1
     $(INSTALL) -D -m 0644 $(@D)/u-boot-rockchip.bin \

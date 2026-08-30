@@ -1,0 +1,79 @@
+#!/bin/bash
+
+# Bind-mount /media/ROMs/bios (NVMe) onto /userdata/bios so BIOS files live
+# persistently on NVMe instead of the SD card.
+#
+# BIOS lives only on the SD card by default (plain directory on mmcblk1p2,
+# never unioned with anything) - every reflash wipes it entirely. This bit
+# us 2026-08-04: a prior reflash's BIOS restore only copied back 2 of 26
+# files from the manual NVMe backup, silently breaking neogeo (missing
+# neogeo.zip -> FBNeo couldn't find sp-s3.sp1) and leaving several other
+# systems' BIOS missing too (PSX, Saturn, GBA/GB, PC Engine CD, ...).
+#
+# A mergerfs union (like batocera-storage-manager uses for roms) was tried
+# first, but doesn't fit here: mergerfs earns its complexity when two
+# branches both hold real, coexisting content that needs merging (roms'
+# .roms_base factory-demo content alongside the real NVMe library). BIOS
+# has no such split - the design is simply "SD side stays empty, NVMe side
+# holds everything" - so a plain bind mount does the same job with no FUSE
+# process and no category.* policy to get wrong.
+#
+# Kept as a separate script rather than extending batocera-storage-manager
+# itself (which hardcodes a single roms-only pool throughout) since BIOS is
+# a launch-time dependency for every emulator - a bug here has a much
+# bigger blast radius than a bad ROM merge.
+
+POOL_PATH="/userdata/bios"
+NVME_BIOS="/media/ROMs/bios"
+
+case "$1" in
+  start|restart|reload)
+    # Already bind-mounted (e.g. re-run of this script, or reload) - nothing to do.
+    if mount | grep -q " $POOL_PATH "; then
+      exit 0
+    fi
+
+    # NVMe is internal/always-present on this board, but its mount is still
+    # udev-driven and not guaranteed to have completed by this point in the
+    # init.d sequence - wait briefly rather than fail outright.
+    WAIT=0
+    while [ ! -d "/media/ROMs" ] && [ $WAIT -lt 15 ]; do
+        sleep 1
+        WAIT=$((WAIT+1))
+    done
+    if [ ! -d "/media/ROMs" ]; then
+        # NVMe never showed up this boot - leave bios SD-only rather than block.
+        exit 0
+    fi
+
+    mkdir -p "$NVME_BIOS"
+
+    # First-time migration: move whatever is currently sitting directly in
+    # /userdata/bios (real SD-card content, likely the entire BIOS set the
+    # first time this runs) onto NVMe before the bind mount takes over this
+    # path. Only ever matters once - after the first successful bind mount,
+    # every write to /userdata/bios transparently lands on NVMe already, so
+    # the raw SD-card directory stays empty and this check becomes a no-op
+    # on every later boot (including across reflashes, since a fresh
+    # /userdata/bios created by S12populateshare starts out empty too).
+    if [ -d "$POOL_PATH" ] && [ -n "$(ls -A "$POOL_PATH" 2>/dev/null)" ]; then
+        mv "$POOL_PATH"/* "$NVME_BIOS"/ 2>/dev/null
+        mv "$POOL_PATH"/.[!.]* "$NVME_BIOS"/ 2>/dev/null
+    fi
+    mkdir -p "$POOL_PATH"
+
+    mount --bind "$NVME_BIOS" "$POOL_PATH"
+    ;;
+
+  stop)
+    # Do nothing to avoid delaying shutdown
+    :
+    ;;
+
+  *)
+    echo "Usage: $0 {start|stop|restart|reload}"
+    exit 1
+    ;;
+esac
+
+exit 0

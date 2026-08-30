@@ -1,0 +1,15 @@
+--- a/Source/Core/DolphinNoGUI/PlatformWayland.cpp	2026-08-15 15:14:45.990585353 +0900
++++ b/Source/Core/DolphinNoGUI/PlatformWayland.cpp	2026-08-15 15:14:45.990585353 +0900
+@@ -198,6 +198,12 @@
+   wl_surface_set_opaque_region(m_surface, m_region);
+   wl_surface_commit(m_surface);
+ 
++  // Wait for the compositor to process the initial commit (xdg_surface's
++  // first configure event) before handing this surface to Vulkan - some
++  // WSI implementations query surface/output state that isn't valid until
++  // the compositor has round-tripped at least once past the initial commit.
++  wl_display_roundtrip(m_display);
++
+   // This doesn't seem to have any effect on kwin...
+   xdg_surface_set_window_geometry(m_xdg_surface, Config::Get(Config::MAIN_RENDER_WINDOW_XPOS),
+                                   Config::Get(Config::MAIN_RENDER_WINDOW_YPOS),

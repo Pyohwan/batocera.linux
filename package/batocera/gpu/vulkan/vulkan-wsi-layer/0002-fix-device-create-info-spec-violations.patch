@@ -1,0 +1,114 @@
+From: Claude (odroid-m1-g29p1 session)
+Subject: [PATCH] Fix vkCreateDevice failures against strict ICDs (duplicate
+ extensions, pEnabledFeatures/pNext conflict)
+
+Root-caused live against the ODROID-M1 g29p1 Mali blob ICD, which rejects
+vkCreateDevice outright with VK_ERROR_INITIALIZATION_FAILED (rather than
+tolerating it, as some more lenient drivers do) in two situations this
+layer can itself introduce or pass through unmodified:
+
+1. add_device_extensions_required_by_layer() could append an extension the
+   application had already requested itself (e.g. RetroArch's own Vulkan
+   HW render context negotiation - used by libretro cores such as
+   ppsspp_libretro - already requests VK_KHR_external_fence/_fd, which
+   this function's "optional extensions independent of winsys" list and
+   its per-platform required-extensions list both also add unconditionally).
+   The result is a genuine duplicate extension name in
+   ppEnabledExtensionNames, which VUID-VkDeviceCreateInfo-ppEnabledExtensionNames-01387
+   forbids. Fixed by skipping anything extensions_to_enable already
+   contains in both places before adding it.
+
+2. The layer forwards the application's VkDeviceCreateInfo essentially
+   unmodified aside from the extension list. Some applications (again,
+   confirmed live for RetroArch's Vulkan HW render context negotiation)
+   set a legacy non-NULL pEnabledFeatures *and* chain a
+   VkPhysicalDeviceFeatures2 in pNext at the same time, which
+   VUID-VkDeviceCreateInfo-pNext-00373 forbids. Fixed by clearing
+   pEnabledFeatures in create_device() whenever a VkPhysicalDeviceFeatures2
+   is also present in pNext - the pNext version is a strict superset of
+   what the legacy struct could express, so dropping the redundant pointer
+   is always safe.
+
+Verified live: libretro ppsspp_libretro.so (RetroArch) with video_driver=vulkan
+went from an immediate SIGABRT (vkCreateDevice returning
+VK_ERROR_INITIALIZATION_FAILED, silently ignored by the core, followed by
+the Khronos loader's own validation catching the resulting invalid device
+handle on the first vkGetDeviceQueue call) to a full clean run: device
+created, Vulkan surface + 3-image swapchain created, FIFO present mode
+selected, no dmesg GPU faults. This is a generic fix in the layer's own
+device-creation path, independent of windowing system, so it should also
+benefit any other libretro core using RetroArch's Vulkan HW render
+negotiation path (parallel_n64/ParaLLEl-RDP, MAME with Vulkan support,
+etc.), not just PPSSPP.
+---
+--- a/layer/layer.cpp	2026-08-15 12:23:48.026222154 +0900
++++ b/layer/layer.cpp
+@@ -310,6 +310,24 @@
+       }
+    }
+ 
++   /* Some applications (confirmed live: RetroArch's Vulkan HW render context
++    * negotiation, used by libretro cores such as ppsspp_libretro) build a
++    * VkDeviceCreateInfo with a legacy non-NULL pEnabledFeatures *and* a
++    * chained VkPhysicalDeviceFeatures2 in pNext at the same time - the
++    * Vulkan spec (VUID-VkDeviceCreateInfo-pNext-00373) forbids this, and
++    * this Mali blob ICD rejects the whole vkCreateDevice call outright with
++    * VK_ERROR_INITIALIZATION_FAILED rather than tolerating/ignoring the
++    * redundant legacy pointer the way some other drivers do. Since the
++    * pNext-chained VkPhysicalDeviceFeatures2 is the modern, complete
++    * superset of what pEnabledFeatures could express, it's always safe to
++    * just drop the legacy pointer here when both are present. */
++   if (modified_info.pEnabledFeatures != nullptr &&
++       util::find_extension<VkPhysicalDeviceFeatures2>(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
++                                                        modified_info.pNext) != nullptr)
++   {
++      modified_info.pEnabledFeatures = nullptr;
++   }
++
+    /* Now call create device on the chain further down the list. */
+    TRY_LOG(fpCreateDevice(physicalDevice, &modified_info, pAllocator, pDevice), "Failed to create the device");
+ 
+--- a/wsi/wsi_factory.cpp	2026-08-15 12:23:49.662243358 +0900
++++ b/wsi/wsi_factory.cpp
+@@ -175,6 +175,18 @@
+ 
+       for (auto extension : optional_extensions)
+       {
++         /* The Vulkan spec (VUID-VkDeviceCreateInfo-ppEnabledExtensionNames-01387)
++          * forbids the same extension name appearing twice in
++          * ppEnabledExtensionNames. extensions_to_enable was seeded above with
++          * whatever the application already requested (e.g. RetroArch's own
++          * Vulkan HW render context negotiation already requests
++          * VK_KHR_external_fence/_fd itself) - skip anything already present
++          * instead of appending a duplicate, which this Mali blob ICD rejects
++          * outright with VK_ERROR_INITIALIZATION_FAILED (confirmed live). */
++         if (extensions_to_enable.contains(extension))
++         {
++            continue;
++         }
+          if (available_device_extensions.contains(extension))
+          {
+             TRY_LOG_CALL(extensions_to_enable.add(extension));
+@@ -211,7 +223,21 @@
+          return VK_ERROR_INITIALIZATION_FAILED;
+       }
+ 
+-      TRY_LOG_CALL(extensions_to_enable.add(extensions_required_by_layer));
++      /* Filter out anything the application already requested before merging: the Vulkan spec
++       * (VUID-VkDeviceCreateInfo-ppEnabledExtensionNames-01387) forbids duplicate extension
++       * names in ppEnabledExtensionNames, and this Mali blob ICD rejects such a device create
++       * request outright with VK_ERROR_INITIALIZATION_FAILED (confirmed live - RetroArch's own
++       * Vulkan HW render context negotiation already requests VK_KHR_external_fence/_fd, which
++       * also appear in this platform's required-extensions list above). */
++      util::vector<const char *> required_by_layer_strings{ allocator };
++      TRY_LOG_CALL(extensions_required_by_layer.get_extension_strings(required_by_layer_strings));
++      for (const char *extension : required_by_layer_strings)
++      {
++         if (!extensions_to_enable.contains(extension))
++         {
++            TRY_LOG_CALL(extensions_to_enable.add(extension));
++         }
++      }
+    }
+ 
+    return VK_SUCCESS;

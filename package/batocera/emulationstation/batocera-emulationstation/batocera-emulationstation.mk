@@ -3,8 +3,8 @@
 # batocera-emulationstation
 #
 ################################################################################
-# Last update: Commits on Jul 27, 2026
-BATOCERA_EMULATIONSTATION_VERSION = f5d6be675dc5220606964cd839862064feb81326
+# Last update: Commits on Aug 16, 2026
+BATOCERA_EMULATIONSTATION_VERSION = 3ebebe5c0ce2a30e0ee27a40e4cd3f55550802ff
 BATOCERA_EMULATIONSTATION_SITE = https://github.com/batocera-linux/batocera-emulationstation
 BATOCERA_EMULATIONSTATION_SITE_METHOD = git
 BATOCERA_EMULATIONSTATION_LICENSE = MIT
@@ -32,10 +32,10 @@ endif
 
 ifeq ($(BR2_PACKAGE_HAS_LIBGL)$(BR2_PACKAGE_XSERVER_XORG_SERVER),yy)
 BATOCERA_EMULATIONSTATION_CONF_OPTS += -DGL=ON
-else
-ifeq ($(BR2_PACKAGE_HAS_LIBGLES),y)
+else ifeq ($(BR2_PACKAGE_BATOCERA_GLES3),y)
+BATOCERA_EMULATIONSTATION_CONF_OPTS += -DGLES3=ON
+else ifeq ($(BR2_PACKAGE_HAS_LIBGLES),y)
 BATOCERA_EMULATIONSTATION_CONF_OPTS += -DGLES2=ON
-endif
 endif
 
 ifeq ($(BR2_PACKAGE_RPI_USERLAND),y)
@@ -226,6 +226,11 @@ define BATOCERA_EMULATIONSTATION_WAYLAND_LABWC
 	    $(TARGET_DIR)/usr/bin/labwc-launch
 endef
 
+define BATOCERA_EMULATIONSTATION_ODROIDM1_INPUT
+	python3 $(BATOCERA_EMULATIONSTATION_PKGDIR)/controllers/odroidm1_patch_es_input.py \
+	    $(TARGET_DIR)/usr/share/emulationstation/es_input.cfg
+endef
+
 define BATOCERA_EMULATIONSTATION_BOOT
 	$(INSTALL) -D -m 0755 $(BATOCERA_EMULATIONSTATION_PKGDIR)/S31emulationstation \
 	    $(TARGET_DIR)/etc/init.d/S31emulationstation
@@ -247,5 +252,17 @@ BATOCERA_EMULATIONSTATION_PRE_CONFIGURE_HOOKS += BATOCERA_EMULATIONSTATION_RPI_F
 BATOCERA_EMULATIONSTATION_PRE_CONFIGURE_HOOKS += BATOCERA_EMULATIONSTATION_EXTERNAL_POS
 BATOCERA_EMULATIONSTATION_POST_INSTALL_TARGET_HOOKS += BATOCERA_EMULATIONSTATION_RESOURCES
 BATOCERA_EMULATIONSTATION_POST_INSTALL_TARGET_HOOKS += BATOCERA_EMULATIONSTATION_BOOT
+
+## odroid-m1: SHAKS S6b default gamepad mapping + keyboard hotkey==select,
+## appended onto whatever upstream's es_input.cfg currently is (not a full
+## fsoverlay replacement - this file is upstream's actively-maintained
+## controller DB, freezing the whole thing would silently drop every future
+## upstream controller mapping addition). Must run after BOOT above, which
+## is what actually copies the pristine es_input.cfg to TARGET_DIR - hooks
+## run in registration order, not definition order, so registering this
+## any earlier gets the patch silently clobbered by that copy.
+ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_BSP_ODROIDM1),y)
+BATOCERA_EMULATIONSTATION_POST_INSTALL_TARGET_HOOKS += BATOCERA_EMULATIONSTATION_ODROIDM1_INPUT
+endif
 
 $(eval $(cmake-package))

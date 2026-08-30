@@ -1,0 +1,36 @@
+# Copy (or symlink) this file to output/rk3568-odroidm1/local.mk to build
+# the kernel straight from a live local checkout instead of downloading
+# Pyohwan/linux's fix-hdmi-dsi-dual-livelock branch (BSP 6.1, same kernel
+# as A/B - track C doesn't change kernel branch, see project memory
+# project_odroid_retro_track_c_v3.md §7) - skips buildroot's
+# download/extract steps entirely. Edit the kernel source, then
+# `make linux-rebuild all`, no commit/push needed per iteration.
+#
+# Requires the matching docker mount: pass KERNEL_SRCDIR=<host path to the
+# linux-odroidm1 checkout> on every `make rk3568-odroidm1-build`
+# invocation (see docker/docker.mk's KERNEL_SRCDIR opt-in) - the container
+# only sees the checkout at /kernel-src if that variable is set, e.g.:
+#
+#   make rk3568-odroidm1-build BATCH_MODE=1 KERNEL_SRCDIR=/mnt/2026_990pro_2tb_1_data/git_projects/linux-odroidm1
+#
+# Why this exists: buildroot's git-download cache keys its dl/ tarball
+# filename off BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION's literal string, not
+# off the commit it resolves to. A branch name never changes that string,
+# so pushing new commits to an already-downloaded branch is invisible to
+# buildroot forever - this cost two full iterations of the odroid-m1-
+# panfrost debugging cycle silently rebuilding the same stale commit
+# (see Joplin "B트랙 buildroot 커널 캐시 오염" note, 2026-08-08). This
+# OVERRIDE_SRCDIR mechanism is buildroot's own documented answer for
+# "actively editing source, rebuilding often" (manual: "Using Buildroot
+# during development") - it bypasses the download cache instead of
+# fighting it.
+#
+# Caveat: while this is active, the working tree - not git history - is
+# what's actually being built. Check `git status`/`git stash list` in the
+# kernel repo before trusting what a given image contains, and commit
+# anything worth keeping. Once a build is verified good enough to archive,
+# delete/rename this file and go back to pinning
+# BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION to that commit's full hash in the
+# .board file instead - the two mechanisms are meant to be swapped between,
+# not run at the same time.
+LINUX_OVERRIDE_SRCDIR = /kernel-src

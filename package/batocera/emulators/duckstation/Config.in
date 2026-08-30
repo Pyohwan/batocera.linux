@@ -1,5 +1,13 @@
 config BR2_PACKAGE_DUCKSTATION
 	bool "duckstation"
+	# Vendor-blob boards with BATOCERA_VULKAN on (this package's .mk then
+	# needs full BR2_PACKAGE_MESA3D, which conflicts with
+	# BR2_PACKAGE_MESA3D_HEADERS - see Saturn kronos precedent) are
+	# excluded via batocera-system/Config.in's own select condition, not
+	# a depends-on here: buildroot's Kconfig `select` overrides a failed
+	# `depends on` on the target with only a warning (confirmed live -
+	# same as this build's pre-existing, harmless GStreamer OpenGL
+	# dependency warnings), so a guard on this side has no real effect.
 	select BR2_PACKAGE_DUCKSTATION_COMMON
 	select BR2_PACKAGE_BATOCERA_QT6
 	select BR2_PACKAGE_FMT
