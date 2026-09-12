@@ -239,6 +239,13 @@ class MelonDSGenerator(Generator):
             array=commandArray,
             env={
                 "XDG_CONFIG_HOME": CONFIGS,
-                "XDG_DATA_HOME": SAVES
+                "XDG_DATA_HOME": SAVES,
+                # Default Qt platform ("xcb") aborts immediately - this board
+                # has no X11. "eglfs" was used historically (see melonds.mk)
+                # while Wayland-client EGL was broken, but Track C's labwc
+                # compositor now supports it - "wayland" is required for the
+                # melonds_dual_screen (Window0/Window1 -> separate outputs)
+                # feature, since eglfs has no per-window output placement.
+                "QT_QPA_PLATFORM": "wayland"
             }
         )

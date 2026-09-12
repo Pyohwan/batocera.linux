@@ -4,6 +4,7 @@ import logging
 import re
 import shutil
 import time
+from os import environ
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Final
 
@@ -120,8 +121,21 @@ class Pcsx2Generator(Generator):
             if not re.search(r'^flags\s*:.*\ssse4_1\W', cpuinfo.read(), re.MULTILINE):
                 _logger.warning("CPU does not support SSE4.1 which is required by pcsx2.  The emulator will likely crash with SIGILL (illegal instruction).")
 
+        # check if we're running wayland or X11 - boards with neither (no
+        # compositor, direct KMS/DRM like odroid-m1) need eglfs instead,
+        # otherwise Qt defaults into xcb with no X server to talk to and
+        # aborts outright (same failure class as standalone duckstation-qt/
+        # melonDS, see duckstationGenerator.py)
+        if environ.get("WAYLAND_DISPLAY"):
+            qt_qpa_platform = "wayland"
+        elif environ.get("DISPLAY"):
+            qt_qpa_platform = "xcb"
+        else:
+            qt_qpa_platform = "eglfs"
+
         envcmd: dict[str, str | Path] = {
-            "XDG_CONFIG_HOME": CONFIGS
+            "XDG_CONFIG_HOME": CONFIGS,
+            "QT_QPA_PLATFORM": qt_qpa_platform
         }
 
         # wheels won't work correctly when SDL_GAMECONTROLLERCONFIG is set. excluding wheels from SDL_GAMECONTROLLERCONFIG doesn't fix too.

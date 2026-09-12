@@ -1,0 +1,29 @@
+--- pcsx2-v2.4.0/pcsx2/GS/Renderers/Vulkan/GSDeviceVK.cpp
++++ pcsx2-v2.4.0-lbrpdx/pcsx2/GS/Renderers/Vulkan/GSDeviceVK.cpp
+@@ -2789,9 +2789,23 @@
+ 	if (surface != VK_NULL_HANDLE)
+ 	{
+ 		VkPresentModeKHR present_mode;
+-		if (!VKSwapChain::SelectPresentMode(surface, &m_vsync_mode, &present_mode) ||
+-			!(m_swap_chain = VKSwapChain::Create(m_window_info, surface, present_mode,
+-				  Pcsx2Config::GSOptions::TriStateToOptionalBoolean(GSConfig.ExclusiveFullscreenControl))))
++		if (!VKSwapChain::SelectPresentMode(surface, &m_vsync_mode, &present_mode))
++		{
++			ERROR_LOG("Failed to create swap chain");
++			return false;
++		}
++
++		m_swap_chain = VKSwapChain::Create(m_window_info, surface, present_mode,
++			Pcsx2Config::GSOptions::TriStateToOptionalBoolean(GSConfig.ExclusiveFullscreenControl));
++
++		// VKSwapChain::Create() takes ownership of surface as soon as it constructs the
++		// VKSwapChain (m_surface(surface) in the ctor init list), even when CreateSwapChain()
++		// subsequently fails and Create() returns null - the temporary VKSwapChain's destructor
++		// already destroyed the surface in that case. surface_cleanup below must not destroy it
++		// a second time, so clear the local handle unconditionally right after this call.
++		surface = VK_NULL_HANDLE;
++
++		if (!m_swap_chain)
+ 		{
+ 			ERROR_LOG("Failed to create swap chain");
+ 			return false;

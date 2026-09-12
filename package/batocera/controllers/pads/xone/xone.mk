@@ -5,7 +5,19 @@
 ################################################################################
 
 # Workaround the need for Kernel 5.11 or greater with some boards
-ifeq ($(BR2_PACKAGE_HOST_LINUX_HEADERS_CUSTOM_5_4)$(BR2_PACKAGE_HOST_LINUX_HEADERS_CUSTOM_5_10)$(BR2_KERNEL_HEADERS_5_15),y)
+#
+# This board reports BR2_KERNEL_HEADERS_6_1 so it falls into the v0.5.8
+# branch below by this heuristic, but it's a heavily backported hardkernel
+# BSP fork (Pyohwan/linux, fix-hdmi-dsi-dual-livelock), not a vanilla 6.1 -
+# it already carries the newer `const struct device *` device_type.uevent
+# signature that upstream mainline only picked up much later. v0.5.8's
+# bus.c (and its crypto_akcipher_sync_encrypt() call) predates that, so it
+# fails to build here with -Wincompatible-pointer-types /
+# implicit-function-declaration errors. The bbf0dcc commit below is newer
+# (unreleased, post-v0.5.8) xone main-branch code that already handles
+# this - confirmed building clean against this exact kernel
+# (batocera.linux output-malig29p1, 2026-08-15).
+ifeq ($(BR2_PACKAGE_HOST_LINUX_HEADERS_CUSTOM_5_4)$(BR2_PACKAGE_HOST_LINUX_HEADERS_CUSTOM_5_10)$(BR2_KERNEL_HEADERS_5_15)$(BR2_PACKAGE_BATOCERA_TARGET_BSP_ODROIDM1),y)
     XONE_VERSION = bbf0dcc484c3f5611f4e375da43e0e0ef08f3d18
 else
     XONE_VERSION = v0.5.8

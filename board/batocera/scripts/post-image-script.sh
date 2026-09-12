@@ -13,7 +13,13 @@ GENIMAGE_TMP="${BUILD_DIR}/genimage.tmp"
 ################################
 
 ##### find images to build #####
-BATOCERA_TARGET=$(grep -E "^BR2_PACKAGE_BATOCERA_TARGET_[A-Z_0-9]*=y$" "${BR2_CONFIG}" | grep -vE "_ANY=" | grep -vE "_GLES[0-9]*=" | sed -e s+'^BR2_PACKAGE_BATOCERA_TARGET_\([A-Z_0-9]*\)=y$'+'\1'+)
+# _BSP_ excluded: BR2_PACKAGE_BATOCERA_TARGET_BSP_ODROIDM1 is a board-identity
+# flag (see package/batocera/core/batocera-system/Config.in), not one of the
+# real BATOCERA_TARGET_* board symbols - it's always set alongside
+# BATOCERA_TARGET_RK3568 on this board, so without this exclusion the grep
+# matches both lines and BATOCERA_TARGET becomes "RK3568\nBSP_ODROIDM1"
+# (literal embedded newline), corrupting the final image filename.
+BATOCERA_TARGET=$(grep -E "^BR2_PACKAGE_BATOCERA_TARGET_[A-Z_0-9]*=y$" "${BR2_CONFIG}" | grep -vE "_ANY=" | grep -vE "_GLES[0-9]*=" | grep -vE "_BSP_" | sed -e s+'^BR2_PACKAGE_BATOCERA_TARGET_\([A-Z_0-9]*\)=y$'+'\1'+)
 BATOCERA_LOWER_TARGET=$(echo "${BATOCERA_TARGET}" | tr '[:upper:]' '[:lower:]')
 BATOCERA_IMAGES_TARGETS=$(grep -E "^BR2_TARGET_BATOCERA_IMAGES[ ]*=[ ]*\".*\"[ ]*$" "${BR2_CONFIG}" | sed -e s+"^BR2_TARGET_BATOCERA_IMAGES[ ]*=[ ]*\"\(.*\)\"[ ]*$"+"\1"+)
 if test -z "${BATOCERA_IMAGES_TARGETS}"

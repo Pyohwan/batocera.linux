@@ -1,0 +1,43 @@
+--- pcsx2-v2.4.0/pcsx2/GS/Renderers/Vulkan/VKSwapChain.cpp
++++ pcsx2-v2.4.0-lbrpdx/pcsx2/GS/Renderers/Vulkan/VKSwapChain.cpp
+@@ -9,6 +9,7 @@
+ #include "common/Assertions.h"
+ #include "common/CocoaTools.h"
+ #include "common/Console.h"
++#include "common/Threading.h"
+ #include "common/Timer.h"
+ 
+ #include <algorithm>
+@@ -339,9 +340,29 @@
+ 
+ std::optional<VkSurfaceFormatKHR> VKSwapChain::SelectSurfaceFormat(VkSurfaceKHR surface)
+ {
+-	u32 format_count;
+-	VkResult res = vkGetPhysicalDeviceSurfaceFormatsKHR(
+-		GSDeviceVK::GetInstance()->GetPhysicalDevice(), surface, &format_count, nullptr);
++	// The Wayland surface configure handshake is asynchronous: right after window
++	// creation (or a compositor-driven fullscreen toggle), the surface can briefly
++	// report zero formats even though vkGetPhysicalDeviceSurfaceFormatsKHR() itself
++	// succeeds (VK_SUCCESS with format_count == 0), before the compositor finishes
++	// acking the configure. This is transient, not a real driver/device failure, so
++	// retry for a short while instead of failing the swap chain outright (which was
++	// leaving the caller to tear down a partially-constructed GSDeviceVK and hit
++	// heap corruption in that failure path).
++	u32 format_count = 0;
++	VkResult res = VK_SUCCESS;
++	for (int attempt = 0; attempt < 20; attempt++)
++	{
++		format_count = 0;
++		res = vkGetPhysicalDeviceSurfaceFormatsKHR(
++			GSDeviceVK::GetInstance()->GetPhysicalDevice(), surface, &format_count, nullptr);
++		if (res == VK_SUCCESS && format_count > 0)
++			break;
++
++		if (res != VK_SUCCESS)
++			break;
++
++		Threading::Sleep(10);
++	}
+ 	if (res != VK_SUCCESS || format_count == 0)
+ 	{
+ 		LOG_VULKAN_ERROR(res, "vkGetPhysicalDeviceSurfaceFormatsKHR failed: ");

@@ -1,0 +1,37 @@
+--- a/src/frontend/qt_sdl/Screen.cpp
++++ b/src/frontend/qt_sdl/Screen.cpp
+@@ -17,6 +17,8 @@
+ */
+ 
+ #include <string.h>
++#include <cstdio>
++#include <ctime>
+ 
+ #include <optional>
+ #include <cmath>
+@@ -1256,6 +1258,25 @@
+     }
+ 
+     glContext->SwapBuffers();
++
++    /* frametime logger (env FRAMETIME_LOG) */
++    {
++        static FILE *ft_log = nullptr; static bool ft_init = false;
++        if (!ft_init)
++        {
++            const char *p = getenv("FRAMETIME_LOG");
++            if (p)
++                ft_log = fopen(p, "w");
++            ft_init = true;
++        }
++        if (ft_log)
++        {
++            struct timespec ts;
++            clock_gettime(CLOCK_MONOTONIC, &ts);
++            fprintf(ft_log, "%lld\n",
++                    (long long)(ts.tv_sec * 1000000LL + ts.tv_nsec / 1000));
++        }
++    }
+ }
+ 
+ qreal ScreenPanelGL::devicePixelRatioFromScreen() const

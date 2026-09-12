@@ -1,0 +1,33 @@
+--- a/gfx/video_driver.c
++++ b/gfx/video_driver.c
+@@ -16,6 +16,8 @@
+ 
+ #include <stdlib.h>
+ #include <math.h>
++#include <stdio.h>
++#include <inttypes.h>
+ 
+ #include <retro_inline.h>
+ #include <string/stdstring.h>
+@@ -3835,6 +3837,21 @@
+    if (!video_driver_active)
+       return;
+ 
++   /* frametime logger (env FRAMETIME_LOG) */
++   {
++      static FILE *ft_log; static bool ft_init;
++      if (!ft_init)
++      {
++         const char *p = getenv("FRAMETIME_LOG");
++         if (p)
++            ft_log = fopen(p, "w");
++         ft_init = true;
++      }
++      if (ft_log)
++         fprintf(ft_log, "%" PRId64 ",%d\n",
++               cpu_features_get_time_usec(), data != NULL);
++   }
++
+    new_time                      = cpu_features_get_time_usec();
+    runloop_st->core_run_time     = new_time - runloop_st->core_run_time;
+ 

@@ -34,6 +34,17 @@ else
     LIBRETRO_DOLPHIN_CONF_OPTS += -DENABLE_X11=OFF
 endif
 
+# ROCKNIX's dolphin-lr package.mk enables this unconditionally whenever
+# VULKAN_SUPPORT=yes (no ARM/x86 gating, unlike their parallel-n64-lr) - this
+# core's Vulkan backend is a genuine, generically-available option, not an
+# x86-only experimental one. Matches the same BR2_PACKAGE_BATOCERA_VULKAN
+# gate the standalone dolphin-emu package already uses.
+ifeq ($(BR2_PACKAGE_BATOCERA_VULKAN),y)
+    LIBRETRO_DOLPHIN_CONF_OPTS += -DENABLE_VULKAN=ON
+else
+    LIBRETRO_DOLPHIN_CONF_OPTS += -DENABLE_VULKAN=OFF
+endif
+
 define LIBRETRO_DOLPHIN_INSTALL_TARGET_CMDS
 	$(INSTALL) -D $(@D)/dolphin_libretro.so \
 		$(TARGET_DIR)/usr/lib/libretro/dolphin_libretro.so

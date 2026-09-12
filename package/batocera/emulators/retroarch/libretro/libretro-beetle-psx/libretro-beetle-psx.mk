@@ -26,12 +26,20 @@ LIBRETRO_BEETLE_PSX_EXTRAOPT =
 LIBRETRO_BEETLE_PSX_OUTFILE = mednafen_psx_libretro.so
 
 # Batocera - SBC required_hw_api = "OpenGL Core >= 3.3 | Vulkan >= 1.0"
+# Excluded on vendor-blob boards using mesa3d-headers (MESA3D_HEADERS, e.g.
+# ODROID-M1 Track C's g29p1 Mali blob): live-tested and confirmed the HW/
+# GLES3 renderer produces severe vertical-stripe framebuffer corruption on
+# this exact driver even over plain GL (not just Vulkan) - PS1 is already
+# well covered by swanstation on this board, so no functional loss from
+# excluding it here rather than chasing the underlying driver bug.
 ifeq ($(BR2_PACKAGE_BATOCERA_VULKAN)$(BR2_PACKAGE_BATOCERA_GLES3),yy)
+ifneq ($(BR2_PACKAGE_MESA3D_HEADERS),y)
 LIBRETRO_BEETLE_PSX_EXTRAOPT += HAVE_HW=1
 LIBRETRO_BEETLE_PSX_OUTFILE = mednafen_psx_hw_libretro.so
 # Only force GLES/GLES3 flags if we are NOT on a x86 device
 ifeq ($(BR2_x86_64),)
     LIBRETRO_BEETLE_PSX_EXTRAOPT += GLES=1 GLES3=1
+endif
 endif
 endif
 

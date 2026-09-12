@@ -6,6 +6,6 @@ cores:
         prompt: GRAPHICS API
         description: Choose which graphics API library to use.
         choices:
-          OpenGL: OGL
           Vulkan: Vulkan
+          OpenGL: OGL
         before: internal_resolution

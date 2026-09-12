@@ -1,0 +1,4 @@
+Byte-identical copy of board/batocera/rockchip/rk3568/patches/mpv/0001-add-v4l2request-support.patch
+(confirmed via diff), kept manually in sync - see the ffmpeg/patches-source.txt
+in this same directory for why this board doesn't just include that shared
+patches directory wholesale.

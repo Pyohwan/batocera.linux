@@ -1,0 +1,20 @@
+--- a/src/video/wayland/SDL_waylandopengles.c	2026-08-14 23:02:13.895506292 +0900
++++ b/src/video/wayland/SDL_waylandopengles.c	2026-08-14 23:02:22.119634687 +0900
+@@ -40,7 +40,16 @@
+     int ret;
+     SDL_VideoData *data = (SDL_VideoData *)_this->driverdata;
+ 
+-    ret = SDL_EGL_LoadLibrary(_this, path, (NativeDisplayType) data->display, 0);
++    /* Proprietary Mali blobs (SDL_VIDEO_DRIVER_MALI, see the SDL_egl.c hook
++     * added by sdl2_add_video_mali_gles2.patch) only resolve a Wayland
++     * EGLDisplay via eglGetPlatformDisplayEXT/eglGetPlatformDisplay
++     * (EGL_KHR_platform_wayland). The legacy eglGetDisplay(wl_display*)
++     * auto-detection that Mesa supports is not implemented by the blob and
++     * returns EGL_NO_DISPLAY ("Could not get EGL display"). Passing
++     * platform=0 here (as upstream SDL2 does) skips that Mali dispatch
++     * entirely. EGL_KHR_platform_wayland is a standard extension Mesa
++     * supports too, so passing it unconditionally is safe there as well. */
++    ret = SDL_EGL_LoadLibrary(_this, path, (NativeDisplayType) data->display, EGL_PLATFORM_WAYLAND_KHR);
+ 
+     Wayland_PumpEvents(_this);
+     WAYLAND_wl_display_flush(data->display);

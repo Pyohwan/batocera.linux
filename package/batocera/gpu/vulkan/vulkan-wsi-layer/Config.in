@@ -1,0 +1,15 @@
+config BR2_PACKAGE_VULKAN_WSI_LAYER
+	bool "vulkan-wsi-layer"
+	depends on BR2_PACKAGE_WAYLAND
+	select BR2_PACKAGE_VULKAN_HEADERS
+	select BR2_PACKAGE_VULKAN_LOADER
+	select BR2_PACKAGE_LIBDRM
+	select BR2_PACKAGE_WAYLAND_PROTOCOLS
+	help
+	  ARM's open-source Vulkan layer implementing VK_KHR_wayland_surface
+	  (window system integration) on top of an ICD that only provides
+	  bare VK_KHR_display - needed for the Mali g29p1 proprietary blob,
+	  whose Vulkan ICD does not implement any windowing-system surface
+	  extension itself.
+
+	  https://gitlab.freedesktop.org/mesa/vulkan-wsi-layer

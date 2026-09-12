@@ -1,0 +1,12 @@
+https://github.com/LibreELEC/LibreELEC.tv/tree/master/packages/multimedia/ffmpeg/patches
+
+0001/0003/0004 are byte-identical copies of the shared
+board/batocera/rockchip/rk3568/patches/ffmpeg/ patches of the same name
+(confirmed via diff) - kept manually in sync since this board's
+BR2_GLOBAL_PATCH_DIR doesn't include that shared directory wholesale (most
+of its other packages' patches target Anbernic/other-board specifics, see
+configs/batocera-rk3568-odroidm1.board's uboot comment for the same
+pattern). 0002-wip-hevc-Add-support-for-sps-st-rps-control.patch is the
+only one NOT copied here - it needs newer V4L2 UAPI structs only present
+in the shared target's mainline 7.0.11 kernel headers, not this board's
+BSP 6.1 fork.

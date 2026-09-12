@@ -23,6 +23,37 @@ else
 UID  := $(shell id -u)
 GID  := $(shell id -g)
 
+# Opt-in extra bind mount for iterative package development: point
+# KERNEL_SRCDIR at a local git checkout and it shows up in the container
+# at /kernel-src, ready for a <PKG>_OVERRIDE_SRCDIR=/kernel-src in local.mk
+# (see output/<board>/local.mk - BR2_PACKAGE_OVERRIDE_FILE's default
+# location). This is buildroot's own documented mechanism for "edit
+# source, rebuild, no commit/push needed" - see buildroot manual's "Using
+# Buildroot during development". Without this mount, only a version
+# string that buildroot has ALREADY cached under is enough to make it
+# silently keep reusing a stale download() forever, even after new
+# commits land upstream - this bit the odroid-m1-panfrost kernel branch
+# for two full iterations (see Joplin "buildroot 커널 캐시 오염" note).
+ifdef KERNEL_SRCDIR
+DOCKER_OPTS += -v $(KERNEL_SRCDIR):/kernel-src
+endif
+
+# git worktree checkouts (as opposed to a plain clone) keep their real
+# .git contents in the *main* checkout's .git/worktrees/<name>/, outside
+# PROJECT_DIR entirely - the worktree's own ".git" is just a one-line
+# pointer file with an absolute path to that location. Since only
+# PROJECT_DIR gets bind-mounted above, `git` commands run inside the
+# container (e.g. batocera-system.mk's BATOCERA_SYSTEM_COMMIT) can't
+# resolve it and silently fail ("fatal: not a git repository"), leaving
+# batocera.version's commit suffix empty. Mount the real common dir at
+# the same absolute host path so it resolves identically in-container.
+GIT_COMMON_DIR := $(shell cd $(PROJECT_DIR) && git rev-parse --git-common-dir 2>/dev/null | xargs -I{} realpath {} 2>/dev/null)
+ifneq ($(GIT_COMMON_DIR),)
+ifeq ($(filter $(PROJECT_DIR)/%,$(GIT_COMMON_DIR)),)
+DOCKER_OPTS += -v $(GIT_COMMON_DIR):$(GIT_COMMON_DIR):ro
+endif
+endif
+
 define RUN_DOCKER
 	$(DOCKER) run -t --init --rm \
 		-v $(PROJECT_DIR):/build \

@@ -7,6 +7,25 @@ config BR2_PACKAGE_MELONDS
     select BR2_PACKAGE_LIBEPOXY
     select BR2_PACKAGE_SDL2
     select BR2_PACKAGE_SLIRP
+    # xlib_libX11 and its own x11r7 Config.in selects (libxcb, xtrans,
+    # libXau, libXdmcp) all live inside "if BR2_PACKAGE_XORG7" - on this
+    # Wayland-only board XORG7=n, so a select landing on one of these
+    # symbols still forces it to y (just a Kconfig WARNING, confirmed via
+    # a real olddefconfig run), but that forced symbol's OWN outgoing
+    # selects do not reliably cascade any further (multi-hop select
+    # through an unmet-dependency node breaks here - confirmed: selecting
+    # only XLIB_LIBX11 left libxcb/xtrans/libXau/libXdmcp unset even
+    # though xlib_libX11's Config.in selects all four). Flattened to a
+    # direct select list so every one of them is forced straight from this
+    # (cleanly enabled) MELONDS symbol instead of relying on the chain.
+    select BR2_PACKAGE_XLIB_LIBX11
+    select BR2_PACKAGE_LIBXCB
+    select BR2_PACKAGE_XCB_PROTO
+    select BR2_PACKAGE_XLIB_XTRANS
+    select BR2_PACKAGE_XLIB_LIBXAU
+    select BR2_PACKAGE_XLIB_LIBXDMCP
+    select BR2_PACKAGE_XUTIL_UTIL_MACROS
+    select BR2_PACKAGE_XORGPROTO
     help
       A Ninteno DS emulator
 

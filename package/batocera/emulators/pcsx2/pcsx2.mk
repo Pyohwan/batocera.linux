@@ -24,7 +24,11 @@ PCSX2_SUPPORTS_IN_SOURCE_BUILD = NO
 PCSX2_DEPENDENCIES += alsa-lib ecm fmt freetype host-clang host-libcurl kddockwidgets
 PCSX2_DEPENDENCIES += libaio libbacktrace libcurl libgtk3 libpcap libpng libsamplerate
 PCSX2_DEPENDENCIES += libsoundtouch plutosvg portaudio qt6base qt6svg qt6tools
-PCSX2_DEPENDENCIES += rapidyaml shaderc sdl3 webp wxwidgets xorgproto yaml-cpp zlib
+PCSX2_DEPENDENCIES += rapidyaml shaderc sdl3 webp xorgproto yaml-cpp zlib
+
+ifeq ($(BR2_PACKAGE_HAS_LIBGL),y)
+PCSX2_DEPENDENCIES += wxwidgets
+endif
 
 # Use clang for performance
 PCSX2_CONF_OPTS += -DCMAKE_C_COMPILER=$(HOST_DIR)/bin/clang
@@ -48,6 +52,48 @@ define PCSX2_FIX_WHOLE_ARCHIVE
 	find $(@D) -name "CMakeLists.txt" -exec sed -i 's|.[<]LINK_LIBRARY:WHOLE_ARCHIVE,\([^>]*\)>|-Wl,--whole-archive \1 -Wl,--no-whole-archive|g' {} +
 endef
 PCSX2_PRE_CONFIGURE_HOOKS += PCSX2_FIX_WHOLE_ARCHIVE
+
+# pcsx2-qt/QtUtils.cpp includes QtGui/private/qtx11extras_p.h under a bare
+# #ifdef Q_OS_LINUX (not gated on the X11_API CMake option below at all),
+# so it still breaks with X11_API=OFF on this xcb-less Qt6 (Wayland-only
+# board, same-class fix as melonDS/kddockwidgets). The only use
+# (QX11Info::isPlatformX11() inside IsCompositorManagerRunning()) is
+# already runtime-dead here, so drop both instead of rebuilding qt6base
+# with xcb just for unreachable code.
+define PCSX2_FIX_X11EXTRAS_INCLUDE
+    python3 -c "\
+p = '$(@D)/pcsx2-qt/QtUtils.cpp'; \
+s = open(p).read(); \
+old_include = '''#ifdef Q_OS_LINUX\n#include <QtGui/private/qtx11extras_p.h>\n#endif\n'''; \
+old_branch = '''#ifdef Q_OS_LINUX\n\t\tif (QX11Info::isPlatformX11() && !QX11Info::isCompositingManagerRunning())\n\t\t\treturn false;\n#endif\n\n'''; \
+assert s.count(old_include) == 1 and s.count(old_branch) == 1, 'pcsx2 QtUtils.cpp X11 block not found - upstream source changed, review this patch'; \
+s = s.replace(old_include, '', 1).replace(old_branch, '', 1); \
+open(p, 'w').write(s)"
+endef
+PCSX2_PRE_CONFIGURE_HOOKS += PCSX2_FIX_X11EXTRAS_INCLUDE
+
+# common/Linux/LnxMisc.cpp wraps Common::SetMousePosition/
+# AttachMousePositionCb/DetachMousePositionCb entirely in
+# #if defined(X11_API) with no non-X11 Linux fallback (unlike macOS/
+# Windows, which both have real implementations) - upstream simply never
+# added a Wayland/generic-Linux path for this X11-only mouse-warp/raw-
+# motion feature. With X11_API=OFF on this board the symbols don't exist
+# at all, but MainWindow.cpp/InterfaceSettingsWidget.cpp reference them
+# unconditionally, so the link fails. Add the same "unsupported" stub
+# contract the callers already handle gracefully (AttachMousePositionCb
+# returning false just logs a warning - see MainWindow.cpp's
+# setupMouseMoveHandler()); this only disables lightgun-style mouse-warp
+# aiming, not the emulator itself.
+define PCSX2_FIX_LINUX_MOUSE_POSITION_STUB
+    python3 -c "\
+p = '$(@D)/common/Linux/LnxMisc.cpp'; \
+s = open(p).read(); \
+old = '#endif // X11_API\n'; \
+assert s.count(old) == 1, 'pcsx2 LnxMisc.cpp X11_API block not found - upstream source changed, review this patch'; \
+new = '''#else\nvoid Common::SetMousePosition(int x, int y)\n{\n}\n\nbool Common::AttachMousePositionCb(std::function<void(int, int)> cb)\n{\n\treturn false;\n}\n\nvoid Common::DetachMousePositionCb()\n{\n}\n#endif // X11_API\n'''; \
+open(p, 'w').write(s.replace(old, new, 1))"
+endef
+PCSX2_PRE_CONFIGURE_HOOKS += PCSX2_FIX_LINUX_MOUSE_POSITION_STUB
 
 ifeq ($(BR2_PACKAGE_XORG7),y)
     PCSX2_CONF_OPTS += -DX11_API=ON

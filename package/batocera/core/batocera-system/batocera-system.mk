@@ -12,6 +12,28 @@ BATOCERA_SYSTEM_DATE = $(shell date "+%Y/%m/%d")
 BATOCERA_SYSTEM_DEPENDENCIES = tzdata
 BATOCERA_SYSTEM_INSTALL_IMAGES = YES
 
+# odroid-m1: only override the version string once we actually cut a
+# tagged release (batocera44-odroidm1-vX.Y.Z) - before that, keep
+# upstream's plain "44-dev" untouched (matches upstream's own dev-build
+# identifier exactly; the previously-missing commit hash was purely the
+# git-worktree docker mount bug above this file, now fixed, not a reason
+# to also rebrand every dev build with an odroid-m1 prefix).
+#
+# The git tag itself keeps the "batocera44-odroidm1-vX.Y.Z" form (reads
+# well in GitHub's tag/release list), but that string can't be used
+# as-is for BATOCERA_SYSTEM_VERSION: ES's version label is literally
+# "BATOCERA.LINUX ES V" + this value, so the tag's own "batocera"/"v"
+# would double up into "...ES Vbatocera44-odroidm1-v1.0.0". Strip those
+# down to "44-odroidm1-1.0.0" so the displayed label reads
+# "...ES V44-odroidm1-1.0.0", matching the shape of upstream's own
+# "V44-dev-<hash>".
+ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_BSP_ODROIDM1),y)
+BATOCERA_SYSTEM_ODROIDM1_RELEASE_TAG := $(shell cd $(BR2_EXTERNAL_BATOCERA_PATH) && git describe --exact-match --tags --match 'batocera44-odroidm1-v*' 2>/dev/null)
+ifneq ($(BATOCERA_SYSTEM_ODROIDM1_RELEASE_TAG),)
+BATOCERA_SYSTEM_VERSION := $(shell echo $(BATOCERA_SYSTEM_ODROIDM1_RELEASE_TAG) | sed -e 's/^batocera//' -e 's/-v/-/')
+endif
+endif
+
 ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_BCM2837),y)
 	BATOCERA_SYSTEM_ARCH=bcm2837
 else ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_RK3399),y)

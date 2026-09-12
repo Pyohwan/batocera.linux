@@ -1,4 +1,5 @@
 /output
+/output-*
 /dl
 /configs/batocera-*_defconfig
 /configs/batocera-board.local.common
@@ -34,3 +35,4 @@ batocera-mok.key
 typescript
 .ruff_cache
 .coverage
+*.mo
